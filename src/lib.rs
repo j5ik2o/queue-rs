@@ -96,122 +96,99 @@ pub trait BlockingQueueBehavior<E: Debug + Send + Sync>: QueueBehavior<E> {
 
 #[derive(Debug, Clone)]
 pub struct BlockingQueueVec<E> {
-  inner: Arc<Mutex<Inner<E>>>,
+  underlying: Arc<Mutex<QueueVec<E>>>,
+  take: Arc<Mutex<MutexCvar>>,
+  put: Arc<Mutex<MutexCvar>>,
 }
 
-#[derive(Debug)]
-struct Inner<E> {
-  underlying: QueueVec<E>,
-  take_lock: Mutex<bool>,
-  take_cvar: Condvar,
-  put_lock: Mutex<bool>,
-  put_cvar: Condvar,
+struct MutexCvar {
+  lock: Mutex<bool>,
+  cvar: Condvar,
 }
 
-impl<E> Inner<E> {
-  fn new(
-    underlying: QueueVec<E>,
-    take_lock: Mutex<bool>,
-    take_cvar: Condvar,
-    put_lock: Mutex<bool>,
-    put_cvar: Condvar,
-  ) -> Self {
-    Self {
-      underlying,
-      take_lock,
-      take_cvar,
-      put_lock,
-      put_cvar,
-    }
+impl MutexCvar {
+  pub fn new(lock: Mutex<bool>, cvar: Condvar) -> Self {
+    Self { lock, cvar }
   }
 }
 
 impl<E: Debug + Clone + Sync + Send + 'static> QueueBehavior<E> for BlockingQueueVec<E> {
   fn len(&self) -> usize {
-    let lq = self.inner.lock().unwrap();
-    lq.underlying.len()
+    let lq = self.underlying.lock().unwrap();
+    lq.len()
   }
 
   fn offer(&mut self, e: E) -> Result<()> {
-    let mut lq = self.inner.lock().unwrap();
-    lq.underlying.offer(e)
+    let mut lq = self.underlying.lock().unwrap();
+    lq.offer(e)
   }
 
   fn poll(&mut self) -> Option<E> {
-    let mut lq = self.inner.lock().unwrap();
-    let result = lq.underlying.poll();
+    let mut lq = self.underlying.lock().unwrap();
+    let result = lq.poll();
     result
   }
 
   fn peek(&self) -> Option<E> {
-    let lq = self.inner.lock().unwrap();
-    lq.underlying.peek()
+    let lq = self.underlying.lock().unwrap();
+    lq.peek()
   }
 }
 
 impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for BlockingQueueVec<E> {
   fn put(&mut self, e: E) -> Result<()> {
     loop {
-      let inner = self.inner.lock().unwrap();
+      let underlying = self.underlying.lock().unwrap();
       log::debug!(
         "len = {}, num_elements = {}",
-        inner.underlying.len(),
-        inner.underlying.num_elements
+        underlying.len(),
+        underlying.num_elements
       );
-      if inner.underlying.len() < inner.underlying.num_elements {
+      if underlying.len() < underlying.num_elements {
         break;
       }
+      drop(underlying);
       {
-        let mut pl = inner.put_lock.lock().unwrap();
+        let mut p = self.put.lock().unwrap();
         log::debug!("put_cvar#wait..");
-        let _ = inner
-          .put_cvar
-          .wait_timeout_while(pl, Duration::from_secs(1), |pl| !*pl)
-          .unwrap()
-          .0;
-        drop(inner);
-        sleep(Duration::from_secs(1));
+        let mut pl = p.lock.lock().unwrap();
+        let _ = p.cvar.wait_while(pl, |pl| !**pl).unwrap();
       }
     }
-    let mut inner = self.inner.lock().unwrap();
-    inner.underlying.offer(e);
+    let mut underlying = self.underlying.lock().unwrap();
+    underlying.offer(e);
     log::debug!("start: take_cvar#notify_one");
-    let mut pl = inner.put_lock.lock().unwrap();
+    let mut pl = self.put_lock.lock().unwrap();
     *pl = true;
-    inner.take_cvar.notify_one();
+    self.take_cvar.notify_one();
     log::debug!("finish: take_cvar#notify_one");
     Ok(())
   }
 
   fn take(&mut self) -> Option<E> {
     loop {
-      let inner = self.inner.lock().unwrap();
+      let underlying = self.underlying.lock().unwrap();
       log::debug!(
         "len = {}, num_elements = {}",
-        inner.underlying.len(),
-        inner.underlying.num_elements
+        underlying.len(),
+        underlying.num_elements
       );
-      if inner.underlying.len() > 0 {
+      if underlying.len() > 0 {
         break;
       }
+      drop(underlying);
       {
-        let mut tl = inner.take_lock.lock().unwrap();
+        let mut tl = self.take_lock.lock().unwrap();
         log::debug!("take_cvar#wait..");
-        let _ = inner
-          .take_cvar
-          .wait_timeout_while(tl, Duration::from_secs(1), |tl| !*tl)
-          .unwrap()
-          .0;
-        drop(inner);
-        sleep(Duration::from_secs(1));
+        let _ = self.take_cvar.wait_while(tl, |tl| !*tl).unwrap();
       }
     }
-    let mut inner = self.inner.lock().unwrap();
-    let result = inner.underlying.poll();
+    let mut underlying = self.underlying.lock().unwrap();
+    let result = underlying.poll();
     log::debug!("start: put_cvar#notify_one");
-    let mut l = inner.put_lock.lock().unwrap();
+    let mut l = self.put_lock.lock().unwrap();
     *l = true;
-    inner.put_cvar.notify_one();
+    self.put_cvar.notify_one();
     log::debug!("finish: put_cvar#notify_one");
     result
   }
@@ -220,10 +197,12 @@ impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for Bloc
 impl<E: Debug + Send + Sync + 'static> BlockingQueueVec<E> {
   pub fn new() -> Self {
     Self {
-      inner: Arc::new(Mutex::new(Inner::new(
-        QueueVec::new(),
+      underlying: Arc::new(Mutex::new(QueueVec::new())),
+      take: Arc::new(Mutex::new(MutexCvar::new(
         Mutex::new(false),
         Condvar::new(),
+      ))),
+      put: Arc::new(Mutex::new(MutexCvar::new(
         Mutex::new(false),
         Condvar::new(),
       ))),
@@ -232,10 +211,12 @@ impl<E: Debug + Send + Sync + 'static> BlockingQueueVec<E> {
 
   pub fn with_num_elements(num_elements: usize) -> Self {
     Self {
-      inner: Arc::new(Mutex::new(Inner::new(
-        QueueVec::with_num_elements(num_elements),
+      underlying: Arc::new(Mutex::new(QueueVec::with_num_elements(num_elements))),
+      take: Arc::new(Mutex::new(MutexCvar::new(
         Mutex::new(false),
         Condvar::new(),
+      ))),
+      put: Arc::new(Mutex::new(MutexCvar::new(
         Mutex::new(false),
         Condvar::new(),
       ))),
