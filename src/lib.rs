@@ -99,6 +99,8 @@ pub struct BlockingQueueVec<E> {
   underlying: Arc<Mutex<QueueVec<E>>>,
   take: Arc<Mutex<MutexCvar>>,
   put: Arc<Mutex<MutexCvar>>,
+  take_limit: usize,
+  put_limit: usize,
 }
 
 #[derive(Debug)]
@@ -148,7 +150,7 @@ impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for Bloc
     let num_elements = underlying.num_elements;
     drop(underlying);
     // log::debug!("put_cvar#wait..");
-    while len == num_elements {
+    while len == self.put_limit {
       let mut put_guard = self.put.lock().unwrap();
       let mut put_lock_guard = (&*put_guard).lock.lock().unwrap();
       let put_wait_flg = (&*put_guard)
@@ -184,7 +186,7 @@ impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for Bloc
     // );
     let mut len = underlying.len();
     drop(underlying);
-    while len == 0 {
+    while len == self.take_limit {
       let mut take_guard = self.take.lock().unwrap();
       let mut take_lock_guard = (&*take_guard).lock.lock().unwrap();
       // log::debug!("take_cvar#wait..");
@@ -224,6 +226,8 @@ impl<E: Debug + Send + Sync + 'static> BlockingQueueVec<E> {
         Mutex::new(false),
         Condvar::new(),
       ))),
+      take_limit: 0,
+      put_limit: usize::MAX,
     }
   }
 
@@ -238,6 +242,8 @@ impl<E: Debug + Send + Sync + 'static> BlockingQueueVec<E> {
         Mutex::new(false),
         Condvar::new(),
       ))),
+      take_limit: 0,
+      put_limit: num_elements,
     }
   }
 }
