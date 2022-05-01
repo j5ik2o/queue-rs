@@ -149,14 +149,14 @@ impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for Bloc
     drop(underlying);
     log::debug!("put_cvar#wait..");
     while len == num_elements {
-      let mut p = self.put.lock().unwrap();
-      let mut pl = (&*p).lock.lock().unwrap();
-      let result = (&*p)
+      let mut put_guard = self.put.lock().unwrap();
+      let mut put_lock_guard = (&*put_guard).lock.lock().unwrap();
+      let put_wait_flg = (&*put_guard)
         .cvar
-        .wait_timeout(pl, Duration::from_secs(1))
+        .wait_timeout(put_lock_guard, Duration::from_secs(1))
         .unwrap()
         .0;
-      if *result {
+      if *put_wait_flg {
         break;
       }
       let underlying = self.underlying.lock().unwrap();
@@ -166,11 +166,11 @@ impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for Bloc
     underlying.offer(e);
     drop(underlying);
     log::debug!("start: take_cvar#notify_one");
-    let p = self.put.lock().unwrap();
-    let mut pl = (&*p).lock.lock().unwrap();
-    *pl = true;
-    let t = self.take.lock().unwrap();
-    (&*t).cvar.notify_one();
+    let put_guard = self.put.lock().unwrap();
+    let mut put_lock_guard = (&*put_guard).lock.lock().unwrap();
+    *put_lock_guard = true;
+    let take_guard = self.take.lock().unwrap();
+    (&*take_guard).cvar.notify_one();
     log::debug!("finish: take_cvar#notify_one");
     Ok(())
   }
@@ -185,15 +185,15 @@ impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for Bloc
     let mut len = underlying.len();
     drop(underlying);
     while len == 0 {
-      let mut t = self.take.lock().unwrap();
-      let mut tl = (&*t).lock.lock().unwrap();
+      let mut take_guard = self.take.lock().unwrap();
+      let mut take_lock_guard = (&*take_guard).lock.lock().unwrap();
       log::debug!("take_cvar#wait..");
-      let result = (&*t)
+      let take_wait_flg = (&*take_guard)
         .cvar
-        .wait_timeout(tl, Duration::from_secs(1))
+        .wait_timeout(take_lock_guard, Duration::from_secs(1))
         .unwrap()
         .0;
-      if *result {
+      if *take_wait_flg {
         break;
       }
       let underlying = self.underlying.lock().unwrap();
@@ -203,10 +203,10 @@ impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for Bloc
     let result = underlying.poll();
     drop(underlying);
     log::debug!("start: put_cvar#notify_one");
-    let mut p = self.put.lock().unwrap();
-    let mut pl = (&*p).lock.lock().unwrap();
-    *pl = true;
-    (&*p).cvar.notify_one();
+    let mut put_guard = self.put.lock().unwrap();
+    let mut put_lock_guard = (&*put_guard).lock.lock().unwrap();
+    *put_lock_guard = true;
+    (&*put_guard).cvar.notify_one();
     log::debug!("finish: put_cvar#notify_one");
     result
   }
