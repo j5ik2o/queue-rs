@@ -101,6 +101,7 @@ pub struct BlockingQueueVec<E> {
   put: Arc<Mutex<MutexCvar>>,
 }
 
+#[derive(Debug)]
 struct MutexCvar {
   lock: Mutex<bool>,
   cvar: Condvar,
@@ -137,58 +138,75 @@ impl<E: Debug + Clone + Sync + Send + 'static> QueueBehavior<E> for BlockingQueu
 
 impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for BlockingQueueVec<E> {
   fn put(&mut self, e: E) -> Result<()> {
-    loop {
-      let underlying = self.underlying.lock().unwrap();
-      log::debug!(
-        "len = {}, num_elements = {}",
-        underlying.len(),
-        underlying.num_elements
-      );
-      if underlying.len() < underlying.num_elements {
+    let underlying = self.underlying.lock().unwrap();
+    log::debug!(
+      "len = {}, num_elements = {}",
+      underlying.len(),
+      underlying.num_elements
+    );
+    let mut len = underlying.len();
+    let num_elements = underlying.num_elements;
+    drop(underlying);
+    log::debug!("put_cvar#wait..");
+    while len == num_elements {
+      let mut p = self.put.lock().unwrap();
+      let mut pl = (&*p).lock.lock().unwrap();
+      let result = (&*p)
+        .cvar
+        .wait_timeout(pl, Duration::from_secs(1))
+        .unwrap()
+        .0;
+      if *result {
         break;
       }
-      drop(underlying);
-      {
-        let mut p = self.put.lock().unwrap();
-        log::debug!("put_cvar#wait..");
-        let mut pl = p.lock.lock().unwrap();
-        let _ = p.cvar.wait_while(pl, |pl| !**pl).unwrap();
-      }
+      let underlying = self.underlying.lock().unwrap();
+      len = underlying.len();
     }
     let mut underlying = self.underlying.lock().unwrap();
     underlying.offer(e);
+    drop(underlying);
     log::debug!("start: take_cvar#notify_one");
-    let mut pl = self.put_lock.lock().unwrap();
+    let p = self.put.lock().unwrap();
+    let mut pl = (&*p).lock.lock().unwrap();
     *pl = true;
-    self.take_cvar.notify_one();
+    let t = self.take.lock().unwrap();
+    (&*t).cvar.notify_one();
     log::debug!("finish: take_cvar#notify_one");
     Ok(())
   }
 
   fn take(&mut self) -> Option<E> {
-    loop {
-      let underlying = self.underlying.lock().unwrap();
-      log::debug!(
-        "len = {}, num_elements = {}",
-        underlying.len(),
-        underlying.num_elements
-      );
-      if underlying.len() > 0 {
+    let underlying = self.underlying.lock().unwrap();
+    log::debug!(
+      "len = {}, num_elements = {}",
+      underlying.len(),
+      underlying.num_elements
+    );
+    let mut len = underlying.len();
+    drop(underlying);
+    while len == 0 {
+      let mut t = self.take.lock().unwrap();
+      let mut tl = (&*t).lock.lock().unwrap();
+      log::debug!("take_cvar#wait..");
+      let result = (&*t)
+        .cvar
+        .wait_timeout(tl, Duration::from_secs(1))
+        .unwrap()
+        .0;
+      if *result {
         break;
       }
-      drop(underlying);
-      {
-        let mut tl = self.take_lock.lock().unwrap();
-        log::debug!("take_cvar#wait..");
-        let _ = self.take_cvar.wait_while(tl, |tl| !*tl).unwrap();
-      }
+      let underlying = self.underlying.lock().unwrap();
+      len = underlying.len();
     }
     let mut underlying = self.underlying.lock().unwrap();
     let result = underlying.poll();
+    drop(underlying);
     log::debug!("start: put_cvar#notify_one");
-    let mut l = self.put_lock.lock().unwrap();
-    *l = true;
-    self.put_cvar.notify_one();
+    let mut p = self.put.lock().unwrap();
+    let mut pl = (&*p).lock.lock().unwrap();
+    *pl = true;
+    (&*p).cvar.notify_one();
     log::debug!("finish: put_cvar#notify_one");
     result
   }
