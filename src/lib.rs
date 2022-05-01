@@ -139,15 +139,15 @@ impl<E: Debug + Clone + Sync + Send + 'static> QueueBehavior<E> for BlockingQueu
 impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for BlockingQueueVec<E> {
   fn put(&mut self, e: E) -> Result<()> {
     let underlying = self.underlying.lock().unwrap();
-    log::debug!(
-      "len = {}, num_elements = {}",
-      underlying.len(),
-      underlying.num_elements
-    );
+    // log::debug!(
+    //   "len = {}, num_elements = {}",
+    //   underlying.len(),
+    //   underlying.num_elements
+    // );
     let mut len = underlying.len();
     let num_elements = underlying.num_elements;
     drop(underlying);
-    log::debug!("put_cvar#wait..");
+    // log::debug!("put_cvar#wait..");
     while len == num_elements {
       let mut put_guard = self.put.lock().unwrap();
       let mut put_lock_guard = (&*put_guard).lock.lock().unwrap();
@@ -165,29 +165,29 @@ impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for Bloc
     let mut underlying = self.underlying.lock().unwrap();
     underlying.offer(e);
     drop(underlying);
-    log::debug!("start: take_cvar#notify_one");
+    // log::debug!("start: take_cvar#notify_one");
     let put_guard = self.put.lock().unwrap();
     let mut put_lock_guard = (&*put_guard).lock.lock().unwrap();
     *put_lock_guard = true;
     let take_guard = self.take.lock().unwrap();
     (&*take_guard).cvar.notify_one();
-    log::debug!("finish: take_cvar#notify_one");
+    // log::debug!("finish: take_cvar#notify_one");
     Ok(())
   }
 
   fn take(&mut self) -> Option<E> {
     let underlying = self.underlying.lock().unwrap();
-    log::debug!(
-      "len = {}, num_elements = {}",
-      underlying.len(),
-      underlying.num_elements
-    );
+    // log::debug!(
+    //   "len = {}, num_elements = {}",
+    //   underlying.len(),
+    //   underlying.num_elements
+    // );
     let mut len = underlying.len();
     drop(underlying);
     while len == 0 {
       let mut take_guard = self.take.lock().unwrap();
       let mut take_lock_guard = (&*take_guard).lock.lock().unwrap();
-      log::debug!("take_cvar#wait..");
+      // log::debug!("take_cvar#wait..");
       let take_wait_flg = (&*take_guard)
         .cvar
         .wait_timeout(take_lock_guard, Duration::from_secs(1))
@@ -202,12 +202,12 @@ impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for Bloc
     let mut underlying = self.underlying.lock().unwrap();
     let result = underlying.poll();
     drop(underlying);
-    log::debug!("start: put_cvar#notify_one");
+    // log::debug!("start: put_cvar#notify_one");
     let mut put_guard = self.put.lock().unwrap();
     let mut put_lock_guard = (&*put_guard).lock.lock().unwrap();
     *put_lock_guard = true;
     (&*put_guard).cvar.notify_one();
-    log::debug!("finish: put_cvar#notify_one");
+    // log::debug!("finish: put_cvar#notify_one");
     result
   }
 }
@@ -260,27 +260,32 @@ mod tests {
   #[test]
   fn test() {
     init_logger();
-    let mut bqv1 = BlockingQueueVec::with_num_elements(1);
+    let mut bqv1 = BlockingQueueVec::with_num_elements(2);
     let mut bqv2 = bqv1.clone();
 
+    let max = 12;
+
     let handler = thread::spawn(move || {
-      log::debug!("take: start: take");
-      let n = bqv2.take();
-      log::debug!("take: finish: take");
-      log::debug!("take: n = {:?}", n);
+      for _ in 1..max {
+        log::debug!("take: start: take");
+        // サイズが0のときはブロックする
+        let n = bqv2.take();
+        log::debug!("take: finish: take");
+        log::debug!("take: n = {:?}", n);
+        log::debug!("<<<<<<<<");
+      }
     });
 
     log::debug!("put: start: sleep");
     sleep(Duration::from_secs(3));
     log::debug!("put: finish: sleep");
 
-    log::debug!("put: start: put - 1");
-    bqv1.put(1);
-    log::debug!("put: finish: put - 1");
-
-    log::debug!("put: start: put - 2");
-    bqv1.put(2);
-    log::debug!("put: finish: put - 2");
+    for i in 1..max {
+      log::debug!("put: start: put - {}", i);
+      bqv1.put(i);
+      log::debug!("put: finish: put - {}", i);
+      log::debug!(">>>>>>>>");
+    }
 
     handler.join().unwrap();
   }
