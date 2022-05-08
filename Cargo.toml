@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.42"
-thiserror = "1.0.26"
+thiserror = "1.0.31"
 log = "0.4"
 
 [dev-dependencies]
