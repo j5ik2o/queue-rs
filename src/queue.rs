@@ -21,6 +21,12 @@ pub enum QueueError<E: Debug + Send + Sync> {
 }
 
 pub trait QueueBehavior<E: Debug + Send + Sync> {
+  fn is_empty(&self) -> bool {
+    self.len() == 0
+  }
+  fn non_empty(&self) -> bool {
+    !self.is_empty()
+  }
   fn len(&self) -> usize;
   /// 容量制限に違反せずにすぐ実行できる場合は、指定された要素をこのキューに挿入します。
   fn offer(&mut self, e: E) -> Result<()>;
