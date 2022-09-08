@@ -50,8 +50,12 @@ impl<E: Debug + Clone + Send + Sync + 'static> QueueBehavior<E> for QueueVec<E> 
     self.values.len()
   }
 
+  fn num_elements(&self) -> usize {
+    self.num_elements
+  }
+
   fn offer(&mut self, e: E) -> Result<()> {
-    if self.num_elements >= self.values.len() + 1 {
+    if self.num_elements() >= self.len() + 1 {
       self.values.push_back(e);
       Ok(())
     } else {

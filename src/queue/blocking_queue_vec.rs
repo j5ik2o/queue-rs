@@ -17,31 +17,37 @@ pub struct BlockingQueueVec<E> {
 
 impl<E: Debug + Clone + Sync + Send + 'static> QueueBehavior<E> for BlockingQueueVec<E> {
   fn len(&self) -> usize {
-    let (qg, _, _) = &*self.underlying;
-    let lq = qg.lock().unwrap();
-    lq.len()
+    let (queue_vec_mutex, _, _) = &*self.underlying;
+    let queue_vec_mutex_guard= queue_vec_mutex.lock().unwrap();
+    queue_vec_mutex_guard.len()
+  }
+
+  fn num_elements(&self) -> usize {
+    let (queue_vec_mutex, _, _) = &*self.underlying;
+    let queue_vec_mutex_guard= queue_vec_mutex.lock().unwrap();
+    queue_vec_mutex_guard.num_elements()
   }
 
   fn offer(&mut self, e: E) -> Result<()> {
-    let (qg, _, not_empty) = &*self.underlying;
-    let mut lq = qg.lock().unwrap();
-    let result = lq.offer(e);
+    let (queue_vec_mutex, _, not_empty) = &*self.underlying;
+    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    let result = queue_vec_mutex_guard.offer(e);
     not_empty.notify_one();
     result
   }
 
   fn poll(&mut self) -> Option<E> {
-    let (qg, not_full, _) = &*self.underlying;
-    let mut lq = qg.lock().unwrap();
-    let result = lq.poll();
+    let (queue_vec_mutex, not_full, _) = &*self.underlying;
+    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    let result = queue_vec_mutex_guard.poll();
     not_full.notify_one();
     result
   }
 
   fn peek(&self) -> Option<E> {
-    let (qg, not_full, _) = &*self.underlying;
-    let lq = qg.lock().unwrap();
-    let result = lq.peek();
+    let (queue_vec_mutex, not_full, _) = &*self.underlying;
+    let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    let result = queue_vec_mutex_guard.peek();
     not_full.notify_one();
     result
   }
@@ -49,23 +55,23 @@ impl<E: Debug + Clone + Sync + Send + 'static> QueueBehavior<E> for BlockingQueu
 
 impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for BlockingQueueVec<E> {
   fn put(&mut self, e: E) -> Result<()> {
-    let (qg, not_full, not_empty) = &*self.underlying;
-    let mut lq = qg.lock().unwrap();
-    while lq.len() == lq.num_elements {
-      lq = not_full.wait(lq).unwrap();
+    let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
+    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    while queue_vec_mutex_guard.is_full() {
+      queue_vec_mutex_guard = not_full.wait(queue_vec_mutex_guard).unwrap();
     }
-    let result = lq.offer(e);
+    let result = queue_vec_mutex_guard.offer(e);
     not_empty.notify_one();
     result
   }
 
   fn take(&mut self) -> Option<E> {
-    let (qg, not_full, not_empty) = &*self.underlying;
-    let mut lq = qg.lock().unwrap();
-    while lq.len() == 0 {
-      lq = not_empty.wait(lq).unwrap();
+    let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
+    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    while queue_vec_mutex_guard.is_empty() {
+      queue_vec_mutex_guard = not_empty.wait(queue_vec_mutex_guard).unwrap();
     }
-    let result = lq.poll();
+    let result = queue_vec_mutex_guard.poll();
     not_full.notify_one();
     result
   }

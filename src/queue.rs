@@ -27,7 +27,16 @@ pub trait QueueBehavior<E: Debug + Send + Sync> {
   fn non_empty(&self) -> bool {
     !self.is_empty()
   }
+  fn is_full(&self) -> bool {
+    self.len() == self.num_elements()
+  }
+  fn non_full(&self) -> bool {
+    !self.is_full()
+  }
   fn len(&self) -> usize;
+  fn num_elements(&self) -> usize;
+  /// The specified element will be inserted into this queue,
+  /// if the queue can be executed immediately without violating the capacity limit.
   /// 容量制限に違反せずにすぐ実行できる場合は、指定された要素をこのキューに挿入します。
   fn offer(&mut self, e: E) -> Result<()>;
   /// キューの先頭を取得および削除します。キューが空の場合は None を返します。
