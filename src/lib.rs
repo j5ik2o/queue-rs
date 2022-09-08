@@ -1,5 +1,3 @@
-#![feature(generic_associated_types)]
-#![feature(associated_type_defaults)]
 #[cfg(test)]
 extern crate env_logger as logger;
 
