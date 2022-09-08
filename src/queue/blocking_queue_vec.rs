@@ -23,22 +23,27 @@ impl<E: Debug + Clone + Sync + Send + 'static> QueueBehavior<E> for BlockingQueu
   }
 
   fn offer(&mut self, e: E) -> Result<()> {
-    let (qg, _, _) = &*self.underlying;
+    let (qg, _, not_empty) = &*self.underlying;
     let mut lq = qg.lock().unwrap();
-    lq.offer(e)
+    let result = lq.offer(e);
+    not_empty.notify_one();
+    result
   }
 
   fn poll(&mut self) -> Option<E> {
-    let (qg, _, _) = &*self.underlying;
+    let (qg, not_full, _) = &*self.underlying;
     let mut lq = qg.lock().unwrap();
     let result = lq.poll();
+    not_full.notify_one();
     result
   }
 
   fn peek(&self) -> Option<E> {
-    let (qg, _, _) = &*self.underlying;
+    let (qg, not_full, _) = &*self.underlying;
     let lq = qg.lock().unwrap();
-    lq.peek()
+    let result = lq.peek();
+    not_full.notify_one();
+    result
   }
 }
 
@@ -50,7 +55,7 @@ impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for Bloc
       lq = not_full.wait(lq).unwrap();
     }
     let result = lq.offer(e);
-    not_empty.notify_all();
+    not_empty.notify_one();
     result
   }
 
@@ -61,7 +66,7 @@ impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for Bloc
       lq = not_empty.wait(lq).unwrap();
     }
     let result = lq.poll();
-    not_full.notify_all();
+    not_full.notify_one();
     result
   }
 }

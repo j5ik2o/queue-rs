@@ -49,7 +49,7 @@ mod tests {
   use std::thread::sleep;
   use std::time::Duration;
   use fp_rust::sync::CountDownLatch;
-  use crate::queue::BlockingQueueVec;
+  use crate::queue::{BlockingQueueVec, QueueBehavior};
   use crate::queue::BlockingQueueBehavior;
 
   fn init_logger() {
@@ -64,14 +64,14 @@ mod tests {
     let cdl = CountDownLatch::new(1);
     let cdl2 = cdl.clone();
 
-    let mut bqv1 = BlockingQueueVec::with_num_elements(2);
+    let mut bqv1 = BlockingQueueVec::with_num_elements(64);
     let mut bqv2 = bqv1.clone();
 
     let max = 5;
 
     let handler1 = thread::spawn(move || {
       cdl2.countdown();
-      for i in 1..max {
+      for i in 1..=max {
         log::debug!("take: start: {}", i);
         let n = bqv2.take();
         log::debug!("take: finish: {},{:?}", i, n);
@@ -83,9 +83,13 @@ mod tests {
     let handler2 = thread::spawn(move || {
       sleep(Duration::from_secs(3));
 
-      for i in 1..max {
+      for i in 1..=max {
         log::debug!("put: start: {}", i);
-        let _ = bqv1.put(i);
+        //if i % 2 == 0 {
+        //  bqv1.put(i).unwrap();
+        //} else {
+        bqv1.offer(i).unwrap();
+        //}
         log::debug!("put: finish: {}", i);
       }
     });
