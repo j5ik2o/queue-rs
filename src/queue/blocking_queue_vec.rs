@@ -18,13 +18,13 @@ pub struct BlockingQueueVec<E> {
 impl<E: Debug + Clone + Sync + Send + 'static> QueueBehavior<E> for BlockingQueueVec<E> {
   fn len(&self) -> usize {
     let (queue_vec_mutex, _, _) = &*self.underlying;
-    let queue_vec_mutex_guard= queue_vec_mutex.lock().unwrap();
+    let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     queue_vec_mutex_guard.len()
   }
 
   fn num_elements(&self) -> usize {
     let (queue_vec_mutex, _, _) = &*self.underlying;
-    let queue_vec_mutex_guard= queue_vec_mutex.lock().unwrap();
+    let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     queue_vec_mutex_guard.num_elements()
   }
 
