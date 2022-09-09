@@ -12,7 +12,7 @@ use thiserror::Error;
 use crate::queue::{BlockingQueueBehavior, QueueSize, QueueBehavior, QueueVec};
 
 #[derive(Debug, Clone)]
-pub struct BlockingQueueVec<E: Debug + Send + Sync, Q: QueueBehavior<E>> {
+pub struct BlockingQueueVec<E: Debug + Clone + Send + Sync, Q: QueueBehavior<E>> {
   underlying: Arc<(Mutex<Q>, Condvar, Condvar)>,
   p: PhantomData<E>,
 }
@@ -83,7 +83,7 @@ impl<E: Debug + Clone + Sync + Send + 'static, Q: QueueBehavior<E>> BlockingQueu
   }
 }
 
-impl<E: Debug + Send + Sync + 'static, Q: QueueBehavior<E>> BlockingQueueVec<E, Q> {
+impl<E: Debug + Clone + Send + Sync + 'static, Q: QueueBehavior<E>> BlockingQueueVec<E, Q> {
   pub fn new(queue: Q) -> Self {
     Self {
       underlying: Arc::new((Mutex::new(queue), Condvar::new(), Condvar::new())),

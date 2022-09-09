@@ -33,6 +33,25 @@ pub enum QueueSize {
   Limited(usize),
 }
 
+impl QueueSize {
+  fn increment(&mut self) {
+    match self {
+      QueueSize::Limited(c) => {
+        *c += 1;
+      }
+      _ => {}
+    }
+  }
+  fn decrement(&mut self) {
+    match self {
+      QueueSize::Limited(c) => {
+        *c -= 1;
+      }
+      _ => {}
+    }
+  }
+}
+
 impl PartialEq<Self> for QueueSize {
   fn eq(&self, other: &Self) -> bool {
     match (self, other) {
@@ -54,7 +73,7 @@ impl PartialOrd<QueueSize> for QueueSize {
   }
 }
 
-pub trait QueueBehavior<E: Debug + Send + Sync> {
+pub trait QueueBehavior<E: Debug + Send + Sync>: Clone + Send {
   /// Returns whether this queue is empty.<br/>
   /// このキューが空かどうかを返します。
   fn is_empty(&self) -> bool {
@@ -120,6 +139,7 @@ extern crate env_logger;
 mod tests {
 
   use std::{env, thread};
+  use std::fmt::Debug;
   use std::io::Write;
   use std::sync::{Arc, Mutex};
   use std::thread::sleep;
@@ -134,14 +154,9 @@ mod tests {
     let _ = env_logger::try_init();
   }
 
-  #[test]
-  fn test() {
-    init_logger();
+  fn test_blocking_queue_vec<Q: QueueBehavior<i32> + 'static>(inner_queue: Q) {
     let cdl = CountDownLatch::new(1);
     let cdl2 = cdl.clone();
-
-    let inner_queue = QueueVec::with_num_elements(5);
-    // let inner_queue = QueueMPSC::new();
 
     let mut bqv1 = BlockingQueueVec::new(inner_queue);
     let mut bqv2 = bqv1.clone();
@@ -175,5 +190,16 @@ mod tests {
 
     handler1.join().unwrap();
     handler2.join().unwrap();
+  }
+
+  #[test]
+  fn test() {
+    init_logger();
+
+    let inner_queue = QueueVec::<i32>::with_num_elements(5);
+    test_blocking_queue_vec(inner_queue);
+
+    let inner_queue = QueueMPSC::<i32>::with_num_elements(5);
+    test_blocking_queue_vec(inner_queue);
   }
 }
