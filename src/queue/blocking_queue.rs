@@ -1,12 +1,10 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::Duration;
 
-use anyhow::anyhow;
 use anyhow::Result;
-use thiserror::Error;
-use crate::queue::{BlockingQueueBehavior, QueueSize, QueueBehavior, QueueVecInner, Element};
+
+use crate::queue::{BlockingQueueBehavior, QueueSize, QueueBehavior, Element};
 
 #[derive(Debug, Clone)]
 pub struct BlockingQueue<E: Element, Q: QueueBehavior<E>> {

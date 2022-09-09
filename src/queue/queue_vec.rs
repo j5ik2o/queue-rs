@@ -1,6 +1,5 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
-use std::sync::{Arc, Condvar, Mutex};
 
 use anyhow::Result;
 

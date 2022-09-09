@@ -3,7 +3,6 @@ use std::sync::mpsc::{channel, Receiver, Sender, SendError, TryRecvError};
 use std::sync::{Arc, Mutex};
 use crate::queue::{Element, QueueBehavior, QueueError, QueueSize};
 
-use anyhow::anyhow;
 use anyhow::Result;
 
 #[derive(Debug, Clone)]

@@ -165,48 +165,63 @@ pub enum QueueType {
 
 #[derive(Debug, Clone)]
 pub enum Queue<T: Element + 'static> {
-  Vec{ inner: QueueVecInner<T> },
-  MPSC{ inner: QueueMPSCInner<T> },
+  Vec { inner: QueueVecInner<T> },
+  MPSC { inner: QueueMPSCInner<T> },
+}
+
+impl<T: Element + 'static> Queue<T> {
+  pub fn with_blocking(self) -> BlockingQueue<T, Queue<T>> {
+    BlockingQueue::new(self)
+  }
 }
 
 impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
   fn len(&self) -> QueueSize {
     match self {
-      Queue::Vec{ inner} => inner.len(),
-      Queue::MPSC{ inner} => inner.len(),
+      Queue::Vec { inner } => inner.len(),
+      Queue::MPSC { inner } => inner.len(),
     }
   }
 
   fn capacity(&self) -> QueueSize {
     match self {
-      Queue::Vec{ inner} => inner.capacity(),
-      Queue::MPSC{ inner} => inner.capacity(),
+      Queue::Vec { inner } => inner.capacity(),
+      Queue::MPSC { inner } => inner.capacity(),
     }
   }
 
   fn offer(&mut self, e: T) -> Result<()> {
     match self {
-      Queue::Vec{ inner} => inner.offer(e),
-      Queue::MPSC{ inner} => inner.offer(e),
+      Queue::Vec { inner } => inner.offer(e),
+      Queue::MPSC { inner } => inner.offer(e),
     }
   }
 
   fn poll(&mut self) -> Result<Option<T>> {
     match self {
-      Queue::Vec{ inner} => inner.poll(),
-      Queue::MPSC{ inner} => inner.poll(),
+      Queue::Vec { inner } => inner.poll(),
+      Queue::MPSC { inner } => inner.poll(),
     }
   }
 }
 
-pub fn with_blocking<T: Element + 'static, Q: QueueBehavior<T>>(queue: Q) -> BlockingQueue<T, Q> {
-  BlockingQueue::new(queue)
-}
-
-pub fn create<T: Element + 'static>(queue_type: QueueType) -> Queue<T> {
-  match queue_type {
-    QueueType::Vec => Queue::Vec{ inner: QueueVecInner::<T>::new() },
-    QueueType::MPSC => Queue::MPSC{ inner: QueueMPSCInner::<T>::new() },
+pub fn create<T: Element + 'static>(
+  queue_type: QueueType,
+  num_elements: Option<usize>,
+) -> Queue<T> {
+  match (queue_type, num_elements) {
+    (QueueType::Vec, None) => Queue::Vec {
+      inner: QueueVecInner::<T>::new(),
+    },
+    (QueueType::Vec, Some(num)) => Queue::Vec {
+      inner: QueueVecInner::<T>::with_num_elements(num),
+    },
+    (QueueType::MPSC, None) => Queue::MPSC {
+      inner: QueueMPSCInner::<T>::new(),
+    },
+    (QueueType::MPSC, Some(num)) => Queue::MPSC {
+      inner: QueueMPSCInner::<T>::with_num_elements(num),
+    },
   }
 }
 
@@ -220,10 +235,7 @@ mod tests {
   use std::thread::sleep;
   use std::time::Duration;
   use fp_rust::sync::CountDownLatch;
-  use crate::queue::{
-    create, QueueType,
-    with_blocking,
-  };
+  use crate::queue::{create, QueueType};
   use crate::queue::BlockingQueueBehavior;
 
   fn init_logger() {
@@ -277,26 +289,9 @@ mod tests {
   fn test() {
     init_logger();
 
-    let q1 = create(QueueType::Vec);
-    let q2 = with_blocking(q1);
+    let q1 = create(QueueType::Vec, Some(32)).with_blocking();
+    test_blocking_queue_vec(q1);
 
-    // let inner_queue = QueueVec::<i32>::with_num_elements(5);
-    test_blocking_queue_vec(q2);
-
-    // let inner_queue = QueueMPSC::<i32>::with_num_elements(5);
-    // test_blocking_queue_vec(inner_queue);
   }
 
-  #[derive(Debug)]
-  struct Value<T: Debug>(T);
-
-  fn println_n<T: Debug>(n: Value<T>) {
-    println!("{:?}", n);
-  }
-
-  #[test]
-  fn test1() {
-    let n = Box::new(Value(1));
-    println_n(*n);
-  }
 }
