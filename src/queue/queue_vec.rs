@@ -11,12 +11,12 @@ use thiserror::Error;
 use crate::queue::{QueueSize, QueueBehavior, QueueError, HasPeekBehavior, Element};
 
 #[derive(Debug, Clone)]
-pub(crate) struct QueueVec<E> {
+pub struct QueueVecInner<E> {
   values: VecDeque<E>,
   pub(crate) capacity: QueueSize,
 }
 
-impl<E> QueueVec<E> {
+impl<E> QueueVecInner<E> {
   pub fn new() -> Self {
     Self {
       values: VecDeque::new(),
@@ -41,7 +41,7 @@ impl<E> QueueVec<E> {
   }
 }
 
-impl<E: Element + 'static> QueueBehavior<E> for QueueVec<E> {
+impl<E: Element + 'static> QueueBehavior<E> for QueueVecInner<E> {
   fn len(&self) -> QueueSize {
     QueueSize::Limited(self.values.len())
   }
@@ -64,7 +64,7 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueVec<E> {
   }
 }
 
-impl<E: Element + 'static> HasPeekBehavior<E> for QueueVec<E> {
+impl<E: Element + 'static> HasPeekBehavior<E> for QueueVecInner<E> {
   fn peek(&self) -> Result<Option<E>> {
     Ok(self.values.front().map(|e| e.clone()))
   }

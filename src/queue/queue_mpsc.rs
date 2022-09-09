@@ -7,14 +7,14 @@ use anyhow::anyhow;
 use anyhow::Result;
 
 #[derive(Debug, Clone)]
-pub(crate) struct QueueMPSC<E> {
+pub struct QueueMPSCInner<E> {
   rx: Arc<Mutex<Receiver<E>>>,
   tx: Sender<E>,
   count: Arc<Mutex<QueueSize>>,
   capacity: Arc<Mutex<QueueSize>>,
 }
 
-impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
+impl<E: Element + 'static> QueueBehavior<E> for QueueMPSCInner<E> {
   fn len(&self) -> QueueSize {
     let count_guard = self.count.lock().unwrap();
     count_guard.clone()
@@ -50,7 +50,7 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
   }
 }
 
-impl<E: Debug + Clone + Send + Sync + 'static> QueueMPSC<E> {
+impl<E: Debug + Clone + Send + Sync + 'static> QueueMPSCInner<E> {
   pub fn new() -> Self {
     let (tx, rx) = channel();
     Self {
