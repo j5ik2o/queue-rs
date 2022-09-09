@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::future::Future;
+use std::marker::PhantomData;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
@@ -8,24 +9,27 @@ use std::time::Duration;
 use anyhow::anyhow;
 use anyhow::Result;
 use thiserror::Error;
-use crate::queue::{BlockingQueueBehavior, QueueBehavior, QueueVec};
+use crate::queue::{BlockingQueueBehavior, Capacity, QueueBehavior, QueueVec};
 
 #[derive(Debug, Clone)]
-pub struct BlockingQueueVec<E> {
-  underlying: Arc<(Mutex<QueueVec<E>>, Condvar, Condvar)>,
+pub struct BlockingQueueVec<E: Debug + Send + Sync, Q: QueueBehavior<E>> {
+  underlying: Arc<(Mutex<Q>, Condvar, Condvar)>,
+  p: PhantomData<E>,
 }
 
-impl<E: Debug + Clone + Sync + Send + 'static> QueueBehavior<E> for BlockingQueueVec<E> {
+impl<E: Debug + Clone + Sync + Send + 'static, Q: QueueBehavior<E>> QueueBehavior<E>
+  for BlockingQueueVec<E, Q>
+{
   fn len(&self) -> usize {
     let (queue_vec_mutex, _, _) = &*self.underlying;
     let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     queue_vec_mutex_guard.len()
   }
 
-  fn num_elements(&self) -> usize {
+  fn capacity(&self) -> Capacity {
     let (queue_vec_mutex, _, _) = &*self.underlying;
     let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
-    queue_vec_mutex_guard.num_elements()
+    queue_vec_mutex_guard.capacity()
   }
 
   fn offer(&mut self, e: E) -> Result<()> {
@@ -53,7 +57,9 @@ impl<E: Debug + Clone + Sync + Send + 'static> QueueBehavior<E> for BlockingQueu
   }
 }
 
-impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for BlockingQueueVec<E> {
+impl<E: Debug + Clone + Sync + Send + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E>
+  for BlockingQueueVec<E, Q>
+{
   fn put(&mut self, e: E) -> Result<()> {
     let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
     let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
@@ -77,24 +83,11 @@ impl<E: Debug + Clone + Sync + Send + 'static> BlockingQueueBehavior<E> for Bloc
   }
 }
 
-impl<E: Debug + Send + Sync + 'static> BlockingQueueVec<E> {
-  pub fn new() -> Self {
+impl<E: Debug + Send + Sync + 'static, Q: QueueBehavior<E>> BlockingQueueVec<E, Q> {
+  pub fn new(queue: Q) -> Self {
     Self {
-      underlying: Arc::new((
-        Mutex::new(QueueVec::with_num_elements(32)),
-        Condvar::new(),
-        Condvar::new(),
-      )),
-    }
-  }
-
-  pub fn with_num_elements(num_elements: usize) -> Self {
-    Self {
-      underlying: Arc::new((
-        Mutex::new(QueueVec::with_num_elements(num_elements)),
-        Condvar::new(),
-        Condvar::new(),
-      )),
+      underlying: Arc::new((Mutex::new(queue), Condvar::new(), Condvar::new())),
+      p: PhantomData::default(),
     }
   }
 }

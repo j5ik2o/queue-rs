@@ -8,26 +8,26 @@ use anyhow::anyhow;
 use anyhow::Result;
 use thiserror::Error;
 
-use crate::queue::{QueueBehavior, QueueError};
+use crate::queue::{Capacity, QueueBehavior, QueueError};
 
 #[derive(Debug, Clone)]
 pub struct QueueVec<E> {
   values: VecDeque<E>,
-  pub(crate) num_elements: usize,
+  pub(crate) capacity: Capacity,
 }
 
 impl<E> QueueVec<E> {
   pub fn new() -> Self {
     Self {
       values: VecDeque::new(),
-      num_elements: usize::MAX,
+      capacity: Capacity::Limitless,
     }
   }
 
   pub fn with_num_elements(num_elements: usize) -> Self {
     Self {
       values: VecDeque::new(),
-      num_elements,
+      capacity: Capacity::Limited(num_elements),
     }
   }
 
@@ -36,12 +36,8 @@ impl<E> QueueVec<E> {
     let vec = values.into_iter().collect::<VecDeque<E>>();
     Self {
       values: vec,
-      num_elements,
+      capacity: Capacity::Limited(num_elements),
     }
-  }
-
-  pub fn num_elements(&self) -> usize {
-    self.num_elements
   }
 }
 
@@ -50,12 +46,12 @@ impl<E: Debug + Clone + Send + Sync + 'static> QueueBehavior<E> for QueueVec<E> 
     self.values.len()
   }
 
-  fn num_elements(&self) -> usize {
-    self.num_elements
+  fn capacity(&self) -> Capacity {
+    self.capacity.clone()
   }
 
   fn offer(&mut self, e: E) -> Result<()> {
-    if self.num_elements() >= self.len() + 1 {
+    if self.capacity >= self.len() + 1 {
       self.values.push_back(e);
       Ok(())
     } else {
