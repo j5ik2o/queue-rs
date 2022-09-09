@@ -9,7 +9,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use anyhow::Result;
 use thiserror::Error;
-use crate::queue::{BlockingQueueBehavior, Capacity, QueueBehavior, QueueVec};
+use crate::queue::{BlockingQueueBehavior, QueueSize, QueueBehavior, QueueVec};
 
 #[derive(Debug, Clone)]
 pub struct BlockingQueueVec<E: Debug + Send + Sync, Q: QueueBehavior<E>> {
@@ -20,13 +20,13 @@ pub struct BlockingQueueVec<E: Debug + Send + Sync, Q: QueueBehavior<E>> {
 impl<E: Debug + Clone + Sync + Send + 'static, Q: QueueBehavior<E>> QueueBehavior<E>
   for BlockingQueueVec<E, Q>
 {
-  fn len(&self) -> usize {
+  fn len(&self) -> QueueSize {
     let (queue_vec_mutex, _, _) = &*self.underlying;
     let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     queue_vec_mutex_guard.len()
   }
 
-  fn capacity(&self) -> Capacity {
+  fn capacity(&self) -> QueueSize {
     let (queue_vec_mutex, _, _) = &*self.underlying;
     let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     queue_vec_mutex_guard.capacity()

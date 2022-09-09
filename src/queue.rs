@@ -22,41 +22,41 @@ pub enum QueueError<E: Debug + Send + Sync> {
 }
 
 #[derive(Debug, Clone)]
-pub enum Capacity {
+pub enum QueueSize {
   Limitless,
   Limited(usize),
 }
 
-impl PartialEq<Self> for Capacity {
+impl PartialEq<Self> for QueueSize {
   fn eq(&self, other: &Self) -> bool {
     match (self, other) {
-      (Capacity::Limitless, Capacity::Limitless) => true,
-      (Capacity::Limited(l), Capacity::Limited(r)) => l == r,
+      (QueueSize::Limitless, QueueSize::Limitless) => true,
+      (QueueSize::Limited(l), QueueSize::Limited(r)) => l == r,
       _ => false,
     }
   }
 }
 
-impl PartialOrd<Capacity> for Capacity {
+impl PartialOrd<QueueSize> for QueueSize {
   fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
     match (self, other) {
-      (Capacity::Limitless, Capacity::Limitless) => Some(Ordering::Equal),
-      (Capacity::Limitless, _) => Some(Ordering::Greater),
-      (_, Capacity::Limitless) => Some(Ordering::Less),
-      (Capacity::Limited(l), Capacity::Limited(r)) => l.partial_cmp(r),
+      (QueueSize::Limitless, QueueSize::Limitless) => Some(Ordering::Equal),
+      (QueueSize::Limitless, _) => Some(Ordering::Greater),
+      (_, QueueSize::Limitless) => Some(Ordering::Less),
+      (QueueSize::Limited(l), QueueSize::Limited(r)) => l.partial_cmp(r),
     }
   }
 }
 
-impl PartialEq<usize> for Capacity {
+impl PartialEq<usize> for QueueSize {
   fn eq(&self, other: &usize) -> bool {
-    self.eq(&Capacity::Limited(*other))
+    self.eq(&QueueSize::Limited(*other))
   }
 }
 
-impl PartialOrd<usize> for Capacity {
+impl PartialOrd<usize> for QueueSize {
   fn partial_cmp(&self, other: &usize) -> Option<Ordering> {
-    self.partial_cmp(&Capacity::Limited(*other))
+    self.partial_cmp(&QueueSize::Limited(*other))
   }
 }
 
@@ -77,8 +77,8 @@ pub trait QueueBehavior<E: Debug + Send + Sync> {
   /// このキューのサイズが容量まで到達したかどうかを返します。
   fn is_full(&self) -> bool {
     match self.capacity() {
-      Capacity::Limited(current_size) => self.len() == current_size,
-      Capacity::Limitless => false,
+      QueueSize::Limited(current_size) => self.len() == current_size,
+      QueueSize::Limitless => false,
     }
   }
 
@@ -90,11 +90,11 @@ pub trait QueueBehavior<E: Debug + Send + Sync> {
 
   /// Returns the length of this queue.<br/>
   /// このキューの長さを返します。
-  fn len(&self) -> usize;
+  fn len(&self) -> QueueSize;
 
   /// Returns the capacity of this queue.<br/>
   /// このキューの最大容量を返します。
-  fn capacity(&self) -> Capacity;
+  fn capacity(&self) -> QueueSize;
 
   /// The specified element will be inserted into this queue,
   /// if the queue can be executed immediately without violating the capacity limit.<br/>
