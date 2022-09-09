@@ -1,12 +1,8 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::sync::{Arc, Condvar, Mutex};
-use std::thread::sleep;
-use std::time::Duration;
 
-use anyhow::anyhow;
 use anyhow::Result;
-use thiserror::Error;
 
 use crate::queue::{QueueSize, QueueBehavior, QueueError, HasPeekBehavior, Element};
 

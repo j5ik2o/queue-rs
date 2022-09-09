@@ -7,14 +7,9 @@ pub use queue_vec::*;
 pub use blocking_queue::*;
 pub use queue_mpsc::*;
 
-use std::collections::VecDeque;
-use std::fmt::{Debug, Formatter};
-use std::rc::Rc;
-use std::sync::{Arc, Condvar, Mutex};
-use std::thread::sleep;
-use std::time::Duration;
+use std::fmt::{Debug};
+use std::sync::{Arc};
 
-use anyhow::anyhow;
 use anyhow::Result;
 use thiserror::Error;
 
@@ -170,36 +165,36 @@ pub enum QueueType {
 
 #[derive(Debug, Clone)]
 pub enum Queue<T: Element + 'static> {
-  Vec(QueueVecInner<T>),
-  MPSC(QueueMPSCInner<T>),
+  Vec{ inner: QueueVecInner<T> },
+  MPSC{ inner: QueueMPSCInner<T> },
 }
 
 impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
   fn len(&self) -> QueueSize {
     match self {
-      Queue::Vec(inner) => inner.len(),
-      Queue::MPSC(inner) => inner.len(),
+      Queue::Vec{ inner} => inner.len(),
+      Queue::MPSC{ inner} => inner.len(),
     }
   }
 
   fn capacity(&self) -> QueueSize {
     match self {
-      Queue::Vec(inner) => inner.capacity(),
-      Queue::MPSC(inner) => inner.capacity(),
+      Queue::Vec{ inner} => inner.capacity(),
+      Queue::MPSC{ inner} => inner.capacity(),
     }
   }
 
   fn offer(&mut self, e: T) -> Result<()> {
     match self {
-      Queue::Vec(inner) => inner.offer(e),
-      Queue::MPSC(inner) => inner.offer(e),
+      Queue::Vec{ inner} => inner.offer(e),
+      Queue::MPSC{ inner} => inner.offer(e),
     }
   }
 
   fn poll(&mut self) -> Result<Option<T>> {
     match self {
-      Queue::Vec(inner) => inner.poll(),
-      Queue::MPSC(inner) => inner.poll(),
+      Queue::Vec{ inner} => inner.poll(),
+      Queue::MPSC{ inner} => inner.poll(),
     }
   }
 }
@@ -210,8 +205,8 @@ pub fn with_blocking<T: Element + 'static, Q: QueueBehavior<T>>(queue: Q) -> Blo
 
 pub fn create<T: Element + 'static>(queue_type: QueueType) -> Queue<T> {
   match queue_type {
-    QueueType::Vec => Queue::Vec(QueueVecInner::<T>::new()),
-    QueueType::MPSC => Queue::MPSC(QueueMPSCInner::<T>::new()),
+    QueueType::Vec => Queue::Vec{ inner: QueueVecInner::<T>::new() },
+    QueueType::MPSC => Queue::MPSC{ inner: QueueMPSCInner::<T>::new() },
   }
 }
 
@@ -222,13 +217,11 @@ extern crate env_logger;
 mod tests {
   use std::{env, thread};
   use std::fmt::Debug;
-  use std::io::Write;
-  use std::sync::{Arc, Mutex};
   use std::thread::sleep;
   use std::time::Duration;
   use fp_rust::sync::CountDownLatch;
   use crate::queue::{
-    BlockingQueue, create, Queue, QueueBehavior, QueueMPSCInner, QueueType, QueueVecInner,
+    create, QueueType,
     with_blocking,
   };
   use crate::queue::BlockingQueueBehavior;
