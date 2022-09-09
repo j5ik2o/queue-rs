@@ -231,7 +231,7 @@ extern crate env_logger;
 #[cfg(test)]
 mod tests {
   use std::{env, thread};
-  use std::fmt::Debug;
+
   use std::thread::sleep;
   use std::time::Duration;
   use fp_rust::sync::CountDownLatch;
@@ -291,7 +291,5 @@ mod tests {
 
     let q1 = create(QueueType::Vec, Some(32)).with_blocking();
     test_blocking_queue_vec(q1);
-
   }
-
 }
