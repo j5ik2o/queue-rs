@@ -1,20 +1,20 @@
 use std::fmt::Debug;
 use std::sync::mpsc::{channel, Receiver, Sender, SendError, TryRecvError};
 use std::sync::{Arc, Mutex};
-use crate::queue::{QueueBehavior, QueueError, QueueSize};
+use crate::queue::{Element, QueueBehavior, QueueError, QueueSize};
 
 use anyhow::anyhow;
 use anyhow::Result;
 
 #[derive(Debug, Clone)]
-pub struct QueueMPSC<E> {
+pub(crate) struct QueueMPSC<E> {
   rx: Arc<Mutex<Receiver<E>>>,
   tx: Sender<E>,
   count: Arc<Mutex<QueueSize>>,
   capacity: Arc<Mutex<QueueSize>>,
 }
 
-impl<E: Debug + Clone + Send + Sync + 'static> QueueBehavior<E> for QueueMPSC<E> {
+impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
   fn len(&self) -> QueueSize {
     let count_guard = self.count.lock().unwrap();
     count_guard.clone()

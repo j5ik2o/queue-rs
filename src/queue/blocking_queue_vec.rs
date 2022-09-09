@@ -9,17 +9,15 @@ use std::time::Duration;
 use anyhow::anyhow;
 use anyhow::Result;
 use thiserror::Error;
-use crate::queue::{BlockingQueueBehavior, QueueSize, QueueBehavior, QueueVec};
+use crate::queue::{BlockingQueueBehavior, QueueSize, QueueBehavior, QueueVec, Element};
 
 #[derive(Debug, Clone)]
-pub struct BlockingQueueVec<E: Debug + Clone + Send + Sync, Q: QueueBehavior<E>> {
+pub struct BlockingQueueVec<E: Element, Q: QueueBehavior<E>> {
   underlying: Arc<(Mutex<Q>, Condvar, Condvar)>,
   p: PhantomData<E>,
 }
 
-impl<E: Debug + Clone + Sync + Send + 'static, Q: QueueBehavior<E>> QueueBehavior<E>
-  for BlockingQueueVec<E, Q>
-{
+impl<E: Element + 'static, Q: QueueBehavior<E>> QueueBehavior<E> for BlockingQueueVec<E, Q> {
   fn len(&self) -> QueueSize {
     let (queue_vec_mutex, _, _) = &*self.underlying;
     let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
@@ -57,7 +55,7 @@ impl<E: Debug + Clone + Sync + Send + 'static, Q: QueueBehavior<E>> QueueBehavio
   // }
 }
 
-impl<E: Debug + Clone + Sync + Send + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E>
+impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E>
   for BlockingQueueVec<E, Q>
 {
   fn put(&mut self, e: E) -> Result<()> {
@@ -83,7 +81,7 @@ impl<E: Debug + Clone + Sync + Send + 'static, Q: QueueBehavior<E>> BlockingQueu
   }
 }
 
-impl<E: Debug + Clone + Send + Sync + 'static, Q: QueueBehavior<E>> BlockingQueueVec<E, Q> {
+impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueVec<E, Q> {
   pub fn new(queue: Q) -> Self {
     Self {
       underlying: Arc::new((Mutex::new(queue), Condvar::new(), Condvar::new())),

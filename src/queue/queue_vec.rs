@@ -8,10 +8,10 @@ use anyhow::anyhow;
 use anyhow::Result;
 use thiserror::Error;
 
-use crate::queue::{QueueSize, QueueBehavior, QueueError, HasPeekBehavior};
+use crate::queue::{QueueSize, QueueBehavior, QueueError, HasPeekBehavior, Element};
 
 #[derive(Debug, Clone)]
-pub struct QueueVec<E> {
+pub(crate) struct QueueVec<E> {
   values: VecDeque<E>,
   pub(crate) capacity: QueueSize,
 }
@@ -41,7 +41,7 @@ impl<E> QueueVec<E> {
   }
 }
 
-impl<E: Debug + Clone + Send + Sync + 'static> QueueBehavior<E> for QueueVec<E> {
+impl<E: Element + 'static> QueueBehavior<E> for QueueVec<E> {
   fn len(&self) -> QueueSize {
     QueueSize::Limited(self.values.len())
   }
@@ -64,7 +64,7 @@ impl<E: Debug + Clone + Send + Sync + 'static> QueueBehavior<E> for QueueVec<E> 
   }
 }
 
-impl<E: Debug + Clone + Send + Sync + 'static> HasPeekBehavior<E> for QueueVec<E> {
+impl<E: Element + 'static> HasPeekBehavior<E> for QueueVec<E> {
   fn peek(&self) -> Result<Option<E>> {
     Ok(self.values.front().map(|e| e.clone()))
   }

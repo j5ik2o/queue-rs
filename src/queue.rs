@@ -8,7 +8,8 @@ pub use blocking_queue_vec::*;
 pub use queue_mpsc::*;
 
 use std::collections::VecDeque;
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
+use std::rc::Rc;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
@@ -17,8 +18,30 @@ use anyhow::anyhow;
 use anyhow::Result;
 use thiserror::Error;
 
+pub trait Element: Debug + Clone + Send + Sync
+where
+  Self: Sized,
+{
+}
+
+impl Element for i8 {}
+impl Element for i16 {}
+impl Element for i32 {}
+impl Element for i64 {}
+impl Element for u8 {}
+impl Element for u16 {}
+impl Element for u32 {}
+impl Element for u64 {}
+impl Element for usize {}
+impl Element for f32 {}
+impl Element for f64 {}
+impl Element for String {}
+
+impl<T: Debug + Clone + Send + Sync> Element for Box<T> {}
+impl<T: Debug + Clone + Send + Sync> Element for Arc<T> {}
+
 #[derive(Error, Debug)]
-pub enum QueueError<E: Debug + Send + Sync> {
+pub enum QueueError<E: Element> {
   #[error("Failed to offer an element: {0:?}")]
   OfferError(E),
   #[error("Failed to pool an element")]
@@ -73,7 +96,7 @@ impl PartialOrd<QueueSize> for QueueSize {
   }
 }
 
-pub trait QueueBehavior<E: Debug + Send + Sync>: Clone + Send {
+pub trait QueueBehavior<E> {
   /// Returns whether this queue is empty.<br/>
   /// このキューが空かどうかを返します。
   fn is_empty(&self) -> bool {
@@ -116,13 +139,13 @@ pub trait QueueBehavior<E: Debug + Send + Sync>: Clone + Send {
   fn poll(&mut self) -> Result<Option<E>>;
 }
 
-pub trait HasPeekBehavior<E: Debug + Send + Sync>: QueueBehavior<E> {
+pub trait HasPeekBehavior<E: Element>: QueueBehavior<E> {
   /// Gets the head of the queue, but does not delete it. Returns None if the queue is empty.<br/>
   /// キューの先頭を取得しますが、削除しません。キューが空の場合は None を返します。
   fn peek(&self) -> Result<Option<E>>;
 }
 
-pub trait BlockingQueueBehavior<E: Debug + Send + Sync>: QueueBehavior<E> {
+pub trait BlockingQueueBehavior<E: Element>: QueueBehavior<E> {
   /// Inserts the specified element into this queue. If necessary, waits until space is available.<br/>
   /// 指定された要素をこのキューに挿入します。必要に応じて、空きが生じるまで待機します。
   fn put(&mut self, e: E) -> Result<()>;
@@ -130,6 +153,28 @@ pub trait BlockingQueueBehavior<E: Debug + Send + Sync>: QueueBehavior<E> {
   /// Retrieve the head of this queue and delete it. If necessary, wait until an element becomes available.<br/>
   /// このキューの先頭を取得して削除します。必要に応じて、要素が利用可能になるまで待機します。
   fn take(&mut self) -> Result<Option<E>>;
+}
+
+pub enum QueueType {
+  Vec,
+  MPSC,
+}
+
+pub fn create<T: Element + 'static>(queue_type: QueueType) -> Box<dyn QueueBehavior<T>> {
+  match queue_type {
+    QueueType::Vec => Box::new(QueueVec::<T>::new()),
+    QueueType::MPSC => Box::new(QueueMPSC::<T>::new()),
+  }
+}
+
+pub fn create_with_num_elements<T: Element + 'static>(
+  queue_type: QueueType,
+  num_elements: usize,
+) -> Box<dyn QueueBehavior<T>> {
+  match queue_type {
+    QueueType::Vec => Box::new(QueueVec::<T>::with_num_elements(num_elements)),
+    QueueType::MPSC => Box::new(QueueMPSC::<T>::with_num_elements(num_elements)),
+  }
 }
 
 #[cfg(test)]
@@ -154,7 +199,10 @@ mod tests {
     let _ = env_logger::try_init();
   }
 
-  fn test_blocking_queue_vec<Q: QueueBehavior<i32> + 'static>(inner_queue: Q) {
+  fn test_blocking_queue_vec<Q: QueueBehavior<i32> + 'static>(inner_queue: Q)
+  where
+    Q: Clone + Send,
+  {
     let cdl = CountDownLatch::new(1);
     let cdl2 = cdl.clone();
 
