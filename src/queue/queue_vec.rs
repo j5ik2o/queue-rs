@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use anyhow::Result;
 use thiserror::Error;
 
-use crate::queue::{QueueSize, QueueBehavior, QueueError};
+use crate::queue::{QueueSize, QueueBehavior, QueueError, HasPeekBehavior};
 
 #[derive(Debug, Clone)]
 pub struct QueueVec<E> {
@@ -59,11 +59,13 @@ impl<E: Debug + Clone + Send + Sync + 'static> QueueBehavior<E> for QueueVec<E> 
     }
   }
 
-  fn poll(&mut self) -> Option<E> {
-    self.values.pop_front()
+  fn poll(&mut self) -> Result<Option<E>> {
+    Ok(self.values.pop_front())
   }
+}
 
-  fn peek(&self) -> Option<E> {
-    self.values.front().map(|e| e.clone())
+impl<E: Debug + Clone + Send + Sync + 'static> HasPeekBehavior<E> for QueueVec<E> {
+  fn peek(&self) -> Result<Option<E>> {
+    Ok(self.values.front().map(|e| e.clone()))
   }
 }

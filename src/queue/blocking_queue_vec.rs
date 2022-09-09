@@ -40,7 +40,7 @@ impl<E: Debug + Clone + Sync + Send + 'static, Q: QueueBehavior<E>> QueueBehavio
     result
   }
 
-  fn poll(&mut self) -> Option<E> {
+  fn poll(&mut self) -> Result<Option<E>> {
     let (queue_vec_mutex, not_full, _) = &*self.underlying;
     let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     let result = queue_vec_mutex_guard.poll();
@@ -48,13 +48,13 @@ impl<E: Debug + Clone + Sync + Send + 'static, Q: QueueBehavior<E>> QueueBehavio
     result
   }
 
-  fn peek(&self) -> Option<E> {
-    let (queue_vec_mutex, not_full, _) = &*self.underlying;
-    let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
-    let result = queue_vec_mutex_guard.peek();
-    not_full.notify_one();
-    result
-  }
+  // fn peek(&self) -> Result<Option<E>> {
+  //   let (queue_vec_mutex, not_full, _) = &*self.underlying;
+  //   let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+  //   let result = queue_vec_mutex_guard.peek();
+  //   not_full.notify_one();
+  //   result
+  // }
 }
 
 impl<E: Debug + Clone + Sync + Send + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E>
@@ -71,7 +71,7 @@ impl<E: Debug + Clone + Sync + Send + 'static, Q: QueueBehavior<E>> BlockingQueu
     result
   }
 
-  fn take(&mut self) -> Option<E> {
+  fn take(&mut self) -> Result<Option<E>> {
     let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
     let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     while queue_vec_mutex_guard.is_empty() {

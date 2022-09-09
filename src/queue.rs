@@ -1,9 +1,11 @@
 mod blocking_queue_vec;
+mod queue_mpsc;
 mod queue_vec;
 
 use std::cmp::Ordering;
 pub use queue_vec::*;
 pub use blocking_queue_vec::*;
+pub use queue_mpsc::*;
 
 use std::collections::VecDeque;
 use std::fmt::Debug;
@@ -19,6 +21,10 @@ use thiserror::Error;
 pub enum QueueError<E: Debug + Send + Sync> {
   #[error("Failed to offer an element: {0:?}")]
   OfferError(E),
+  #[error("Failed to pool an element")]
+  PoolError,
+  #[error("Failed to peek an element")]
+  PeekError,
 }
 
 #[derive(Debug, Clone)]
@@ -48,23 +54,11 @@ impl PartialOrd<QueueSize> for QueueSize {
   }
 }
 
-impl PartialEq<usize> for QueueSize {
-  fn eq(&self, other: &usize) -> bool {
-    self.eq(&QueueSize::Limited(*other))
-  }
-}
-
-impl PartialOrd<usize> for QueueSize {
-  fn partial_cmp(&self, other: &usize) -> Option<Ordering> {
-    self.partial_cmp(&QueueSize::Limited(*other))
-  }
-}
-
 pub trait QueueBehavior<E: Debug + Send + Sync> {
   /// Returns whether this queue is empty.<br/>
   /// このキューが空かどうかを返します。
   fn is_empty(&self) -> bool {
-    self.len() == 0
+    self.len() == QueueSize::Limited(0)
   }
 
   /// Returns whether this queue is non-empty.<br/>
@@ -76,10 +70,7 @@ pub trait QueueBehavior<E: Debug + Send + Sync> {
   /// Returns whether the queue size has reached its capacity.<br/>
   /// このキューのサイズが容量まで到達したかどうかを返します。
   fn is_full(&self) -> bool {
-    match self.capacity() {
-      QueueSize::Limited(current_size) => self.len() == current_size,
-      QueueSize::Limitless => false,
-    }
+    self.capacity() == self.len()
   }
 
   /// Returns whether the queue size has not reached its capacity.<br/>
@@ -103,11 +94,13 @@ pub trait QueueBehavior<E: Debug + Send + Sync> {
 
   /// Retrieves and deletes the head of the queue. Returns None if the queue is empty.<br/>
   /// キューの先頭を取得および削除します。キューが空の場合は None を返します。
-  fn poll(&mut self) -> Option<E>;
+  fn poll(&mut self) -> Result<Option<E>>;
+}
 
+pub trait HasPeekBehavior<E: Debug + Send + Sync>: QueueBehavior<E> {
   /// Gets the head of the queue, but does not delete it. Returns None if the queue is empty.<br/>
   /// キューの先頭を取得しますが、削除しません。キューが空の場合は None を返します。
-  fn peek(&self) -> Option<E>;
+  fn peek(&self) -> Result<Option<E>>;
 }
 
 pub trait BlockingQueueBehavior<E: Debug + Send + Sync>: QueueBehavior<E> {
@@ -117,7 +110,7 @@ pub trait BlockingQueueBehavior<E: Debug + Send + Sync>: QueueBehavior<E> {
 
   /// Retrieve the head of this queue and delete it. If necessary, wait until an element becomes available.<br/>
   /// このキューの先頭を取得して削除します。必要に応じて、要素が利用可能になるまで待機します。
-  fn take(&mut self) -> Option<E>;
+  fn take(&mut self) -> Result<Option<E>>;
 }
 
 #[cfg(test)]
@@ -132,7 +125,7 @@ mod tests {
   use std::thread::sleep;
   use std::time::Duration;
   use fp_rust::sync::CountDownLatch;
-  use crate::queue::{BlockingQueueVec, QueueBehavior, QueueVec};
+  use crate::queue::{BlockingQueueVec, QueueBehavior, QueueMPSC, QueueVec};
   use crate::queue::BlockingQueueBehavior;
 
   fn init_logger() {
@@ -147,7 +140,10 @@ mod tests {
     let cdl = CountDownLatch::new(1);
     let cdl2 = cdl.clone();
 
-    let mut bqv1 = BlockingQueueVec::new(QueueVec::with_num_elements(32));
+    let inner_queue = QueueVec::with_num_elements(5);
+    // let inner_queue = QueueMPSC::new();
+
+    let mut bqv1 = BlockingQueueVec::new(inner_queue);
     let mut bqv2 = bqv1.clone();
 
     let max = 5;
