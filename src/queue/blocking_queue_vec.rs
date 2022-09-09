@@ -12,12 +12,12 @@ use thiserror::Error;
 use crate::queue::{BlockingQueueBehavior, QueueSize, QueueBehavior, QueueVec, Element};
 
 #[derive(Debug, Clone)]
-pub struct BlockingQueueVec<E: Element, Q: QueueBehavior<E>> {
+pub struct BlockingQueue<E: Element, Q: QueueBehavior<E>> {
   underlying: Arc<(Mutex<Q>, Condvar, Condvar)>,
   p: PhantomData<E>,
 }
 
-impl<E: Element + 'static, Q: QueueBehavior<E>> QueueBehavior<E> for BlockingQueueVec<E, Q> {
+impl<E: Element + 'static, Q: QueueBehavior<E>> QueueBehavior<E> for BlockingQueue<E, Q> where Self: Sized {
   fn len(&self) -> QueueSize {
     let (queue_vec_mutex, _, _) = &*self.underlying;
     let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
@@ -56,7 +56,7 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> QueueBehavior<E> for BlockingQue
 }
 
 impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E>
-  for BlockingQueueVec<E, Q>
+  for BlockingQueue<E, Q>
 {
   fn put(&mut self, e: E) -> Result<()> {
     let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
@@ -81,7 +81,7 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E>
   }
 }
 
-impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueVec<E, Q> {
+impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueue<E, Q> {
   pub fn new(queue: Q) -> Self {
     Self {
       underlying: Arc::new((Mutex::new(queue), Condvar::new(), Condvar::new())),
