@@ -235,13 +235,50 @@ mod tests {
   use std::thread::sleep;
   use std::time::Duration;
   use fp_rust::sync::CountDownLatch;
-  use crate::queue::{create, QueueType};
+  use crate::queue::{create, QueueBehavior, QueueType};
   use crate::queue::BlockingQueueBehavior;
 
   fn init_logger() {
     env::set_var("RUST_LOG", "debug");
     // env::set_var("RUST_LOG", "trace");
     let _ = env_logger::try_init();
+  }
+
+  fn test_queue_vec<Q>(queue: Q)
+  where
+    Q: QueueBehavior<i32> + 'static,
+  {
+    let cdl = CountDownLatch::new(1);
+    let cdl2 = cdl.clone();
+
+    let mut q1 = queue;
+    let mut q2 = q1.clone();
+
+    let max = 5;
+
+    let handler1 = thread::spawn(move || {
+      cdl2.countdown();
+      for i in 1..=max {
+        log::debug!("take: start: {}", i);
+        let n = q2.poll();
+        log::debug!("take: finish: {},{:?}", i, n);
+      }
+    });
+
+    cdl.wait();
+
+    let handler2 = thread::spawn(move || {
+      sleep(Duration::from_secs(3));
+
+      for i in 1..=max {
+        log::debug!("put: start: {}", i);
+        q1.offer(i).unwrap();
+        log::debug!("put: finish: {}", i);
+      }
+    });
+
+    handler1.join().unwrap();
+    handler2.join().unwrap();
   }
 
   fn test_blocking_queue_vec<Q>(queue: Q)
@@ -272,11 +309,7 @@ mod tests {
 
       for i in 1..=max {
         log::debug!("put: start: {}", i);
-        //if i % 2 == 0 {
-        //  bqv1.put(i).unwrap();
-        //} else {
         bqv1.offer(i).unwrap();
-        //}
         log::debug!("put: finish: {}", i);
       }
     });
@@ -289,7 +322,10 @@ mod tests {
   fn test() {
     init_logger();
 
-    let q1 = create(QueueType::Vec, Some(32)).with_blocking();
-    test_blocking_queue_vec(q1);
+    let q = create(QueueType::Vec, Some(32));
+    test_queue_vec(q);
+
+    let bq = create(QueueType::Vec, Some(32)).with_blocking();
+    test_blocking_queue_vec(bq);
   }
 }
