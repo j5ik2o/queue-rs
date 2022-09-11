@@ -49,7 +49,7 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueMPSCInner<E> {
   }
 }
 
-impl<E: Debug + Clone + Send + Sync + 'static> QueueMPSCInner<E> {
+impl<E: Element + 'static> QueueMPSCInner<E> {
   pub fn new() -> Self {
     let (tx, rx) = channel();
     Self {
