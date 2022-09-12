@@ -13,24 +13,13 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
-        persist-credentials: true
+        persist-credentials: false
         token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: stable
         override: true
-    - uses: baptiste0928/cargo-install@v1
-      with:
-        crate: cargo-release
-        version: "0.21.1"
     - name: release the crate
       run: |
-        VERSION=$(echo ${GITHUB_REF##*/} | sed 's/^v//')
-        git config user.name "Junichi Kato"
-        git config user.email j5ik2o@gmail.com
-        cargo release --token ${{ secrets.CARGO_TOKEN }} --execute --verbose --no-confirm --no-push $VERSION
-        git checkout main
-        git add Cargo.toml
-        git commit -m 'version up'
-        git push origin main
+        cargo publish --token ${{ secrets.CARGO_TOKEN }}
