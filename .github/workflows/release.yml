@@ -30,3 +30,7 @@ jobs:
         git config user.name "Junichi Kato"
         git config user.email j5ik2o@gmail.com
         cargo release --token ${{ secrets.CARGO_TOKEN }} --execute --verbose --no-confirm --no-push $VERSION
+        git co main
+        git add Cargo.toml
+        git commit -m 'version up'
+        git push origin main
