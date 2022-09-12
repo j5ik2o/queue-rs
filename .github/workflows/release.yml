@@ -1,6 +1,9 @@
 name: release
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - v[1-9]+.[0-9]+.[0-9]+
 env:
   CARGO_TERM_COLOR: always
 jobs:
@@ -21,8 +24,9 @@ jobs:
       with:
         crate: cargo-release
         version: "0.21.1"
-    - name: release the crate
-      run: |
-        git config user.name "Junichi Kato"
-        git config user.email j5ik2o@gmail.com
-        cargo release --token ${{ secrets.CARGO_TOKEN }} --execute --verbose --no-confirm patch
+    - run: echo ${GITHUB_REF##*/}
+#    - name: release the crate
+#      run: |
+#        git config user.name "Junichi Kato"
+#        git config user.email j5ik2o@gmail.com
+#        cargo release --token ${{ secrets.CARGO_TOKEN }} --execute --verbose --no-confirm ${GITHUB_REF##*/}
