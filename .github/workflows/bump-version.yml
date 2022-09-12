@@ -35,7 +35,7 @@ jobs:
         git config --global user.name "Junichi Kato"
         git diff
         git add .
-        git commit -m 'version up'
+        git commit -m 'build: version up'
         git push origin main
         git pull origin main
     - name: Bump version and push tag
