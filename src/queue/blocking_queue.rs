@@ -7,13 +7,12 @@ use anyhow::Result;
 use crate::queue::{BlockingQueueBehavior, QueueSize, QueueBehavior, Element};
 
 #[derive(Debug, Clone)]
-pub struct BlockingQueue<E, Q: QueueBehavior<E>>  {
+pub struct BlockingQueue<E, Q: QueueBehavior<E>> {
   underlying: Arc<(Mutex<Q>, Condvar, Condvar)>,
   p: PhantomData<E>,
 }
 
-impl<E: Element + 'static, Q: QueueBehavior<E>> QueueBehavior<E> for BlockingQueue<E, Q>
-{
+impl<E: Element + 'static, Q: QueueBehavior<E>> QueueBehavior<E> for BlockingQueue<E, Q> {
   fn len(&self) -> QueueSize {
     let (queue_vec_mutex, _, _) = &*self.underlying;
     let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
