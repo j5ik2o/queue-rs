@@ -31,6 +31,8 @@ jobs:
         value: ${{ steps.version.outputs.version }}
     - name: git commit & push
       run: |
+        git config --global user.email "j5ik2o@gmail.com"
+        git config --global user.name "Junichi Kato"
         git add .
         git commit -m 'version up'
         git push origin main
