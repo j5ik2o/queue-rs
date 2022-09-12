@@ -2,6 +2,7 @@ sign-commit                = false
 sign-tag                   = false
 pre-release-commit-message = "chore: bump version"
 dev-version                = false
+push                       = false
 tag                        = false
 consolidate-commits        = false
 consolidate-pushes         = true
