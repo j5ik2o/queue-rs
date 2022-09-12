@@ -26,6 +26,7 @@ jobs:
         version: "0.21.1"
     - name: release the crate
       run: |
+        VERSION=$(echo ${GITHUB_REF##*/} | sed 's/^v//')
         git config user.name "Junichi Kato"
         git config user.email j5ik2o@gmail.com
-        cargo release --token ${{ secrets.CARGO_TOKEN }} --execute --verbose --no-confirm ${GITHUB_REF##*/}
+        cargo release --token ${{ secrets.CARGO_TOKEN }} --execute --verbose --no-confirm $VERSION
