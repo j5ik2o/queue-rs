@@ -227,7 +227,7 @@ mod tests {
   use fp_rust::sync::CountDownLatch;
 
   use crate::queue::BlockingQueueBehavior;
-  use crate::queue::{create, QueueBehavior, QueueType};
+  use crate::queue::{create_queue, QueueBehavior, QueueType};
 
   fn init_logger() {
     env::set_var("RUST_LOG", "debug");
@@ -311,10 +311,10 @@ mod tests {
   fn test() {
     init_logger();
 
-    let q = create(QueueType::Vec, Some(32));
+    let q = create_queue(QueueType::Vec, Some(32));
     test_queue_vec(q);
 
-    let bq = create(QueueType::Vec, Some(32)).with_blocking();
+    let bq = create_queue(QueueType::Vec, Some(32)).with_blocking();
     test_blocking_queue_vec(bq);
   }
 }
