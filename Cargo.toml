@@ -2,6 +2,12 @@
 name = "queue-rs"
 version = "0.0.5"
 edition = "2021"
+description = "A Rust crate for queue"
+license = "MIT OR Apache-2.0"
+keywords = ["queue", "blocking"]
+categories = ["data-structures"]
+readme = "README.md"
+repository = "https://github.com/j5ik2o/queue-rs"
 
 [dependencies]
 anyhow = "1.0.64"
