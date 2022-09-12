@@ -209,7 +209,7 @@ impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
   }
 }
 
-pub fn create<T: Element + 'static>(queue_type: QueueType, num_elements: Option<usize>) -> Queue<T> {
+pub fn create_queue<T: Element + 'static>(queue_type: QueueType, num_elements: Option<usize>) -> Queue<T> {
   match (queue_type, num_elements) {
     (QueueType::Vec, None) => Queue::Vec(QueueVec::<T>::new()),
     (QueueType::Vec, Some(num)) => Queue::Vec(QueueVec::<T>::with_num_elements(num)),
