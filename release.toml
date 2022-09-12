@@ -5,4 +5,3 @@ dev-version                = false
 tag                        = false
 consolidate-commits        = false
 consolidate-pushes         = true
-allow-branch               = ["main"]
