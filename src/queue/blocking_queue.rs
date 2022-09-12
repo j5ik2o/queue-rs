@@ -4,7 +4,7 @@ use std::sync::{Arc, Condvar, Mutex};
 
 use anyhow::Result;
 
-use crate::queue::{BlockingQueueBehavior, QueueSize, QueueBehavior, Element};
+use crate::queue::{BlockingQueueBehavior, Element, QueueBehavior, QueueSize};
 
 #[derive(Debug, Clone)]
 pub struct BlockingQueue<E, Q: QueueBehavior<E>> {

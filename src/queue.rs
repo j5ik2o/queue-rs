@@ -71,6 +71,7 @@ impl QueueSize {
       _ => {}
     }
   }
+
   fn decrement(&mut self) {
     match self {
       QueueSize::Limited(c) => {
@@ -208,10 +209,7 @@ impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
   }
 }
 
-pub fn create<T: Element + 'static>(
-  queue_type: QueueType,
-  num_elements: Option<usize>,
-) -> Queue<T> {
+pub fn create<T: Element + 'static>(queue_type: QueueType, num_elements: Option<usize>) -> Queue<T> {
   match (queue_type, num_elements) {
     (QueueType::Vec, None) => Queue::Vec(QueueVec::<T>::new()),
     (QueueType::Vec, Some(num)) => Queue::Vec(QueueVec::<T>::with_num_elements(num)),
@@ -222,14 +220,14 @@ pub fn create<T: Element + 'static>(
 
 #[cfg(test)]
 mod tests {
-  use std::{env, thread};
   use std::thread::sleep;
   use std::time::Duration;
+  use std::{env, thread};
 
   use fp_rust::sync::CountDownLatch;
 
-  use crate::queue::{create, QueueBehavior, QueueType};
   use crate::queue::BlockingQueueBehavior;
+  use crate::queue::{create, QueueBehavior, QueueType};
 
   fn init_logger() {
     env::set_var("RUST_LOG", "debug");
@@ -239,8 +237,7 @@ mod tests {
 
   fn test_queue_vec<Q>(queue: Q)
   where
-    Q: QueueBehavior<i32> + Clone + 'static,
-  {
+    Q: QueueBehavior<i32> + Clone + 'static, {
     let cdl = CountDownLatch::new(1);
     let cdl2 = cdl.clone();
 
@@ -276,8 +273,7 @@ mod tests {
 
   fn test_blocking_queue_vec<Q>(queue: Q)
   where
-    Q: BlockingQueueBehavior<i32> + Clone + 'static,
-  {
+    Q: BlockingQueueBehavior<i32> + Clone + 'static, {
     let cdl = CountDownLatch::new(1);
     let cdl2 = cdl.clone();
 

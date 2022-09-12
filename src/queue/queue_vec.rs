@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 
-use crate::queue::{QueueSize, QueueBehavior, QueueError, HasPeekBehavior, Element};
+use crate::queue::{Element, HasPeekBehavior, QueueBehavior, QueueError, QueueSize};
 
 #[derive(Debug, Clone)]
 pub struct QueueVec<E> {

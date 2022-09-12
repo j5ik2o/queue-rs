@@ -1,7 +1,7 @@
-use std::fmt::Debug;
-use std::sync::mpsc::{channel, Receiver, Sender, SendError, TryRecvError};
-use std::sync::{Arc, Mutex};
 use crate::queue::{Element, QueueBehavior, QueueError, QueueSize};
+use std::fmt::Debug;
+use std::sync::mpsc::{channel, Receiver, SendError, Sender, TryRecvError};
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 
