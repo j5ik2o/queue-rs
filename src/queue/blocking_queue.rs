@@ -74,7 +74,7 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
   }
 }
 
-impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueue<E, Q> {
+impl<E, Q: QueueBehavior<E>> BlockingQueue<E, Q> {
   pub fn new(queue: Q) -> Self {
     Self {
       underlying: Arc::new((Mutex::new(queue), Condvar::new(), Condvar::new())),

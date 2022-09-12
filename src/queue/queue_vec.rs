@@ -11,7 +11,7 @@ pub struct QueueVec<E> {
   pub(crate) capacity: QueueSize,
 }
 
-impl<E> QueueVec<E> {
+impl<E: Element> QueueVec<E> {
   pub fn new() -> Self {
     Self {
       values: VecDeque::new(),

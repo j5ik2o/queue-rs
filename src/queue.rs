@@ -47,7 +47,7 @@ impl<T: Debug + Clone + Send + Sync> Element for Box<T> {}
 impl<T: Debug + Clone + Send + Sync> Element for Arc<T> {}
 
 #[derive(Error, Debug)]
-pub enum QueueError<E: Element> {
+pub enum QueueError<E> {
   #[error("Failed to offer an element: {0:?}")]
   OfferError(E),
   #[error("Failed to pool an element")]
@@ -167,7 +167,7 @@ pub enum QueueType {
 }
 
 #[derive(Debug, Clone)]
-pub enum Queue<T: Element + 'static> {
+pub enum Queue<T> {
   Vec(QueueVec<T>),
   MPSC(QueueMPSC<T>),
 }
