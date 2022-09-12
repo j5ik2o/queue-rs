@@ -31,6 +31,7 @@ jobs:
     - uses: stefanzweifel/git-auto-commit-action@v4
       with:
         commit_message: version up
+        commit_options: '--amend --no-edit'
     - name: Create a GitHub release
       uses: actions/create-release@v1
       env:
