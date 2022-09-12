@@ -12,25 +12,6 @@ jobs:
         fetch-depth: 0
         persist-credentials: false
         token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-    - name: Calculate changes from the latest tag to HEAD
-      id: changes
-      run: |
-        LATEST_TAG=$(git describe --abbrev=0)
-        echo "latest-tag = $LATEST_TAG"
-        COUNT=$(git log $LATEST_TAG..HEAD --pretty=format:"%s" --no-merges \
-          --grep='^build:' \
-          --grep='^ci:' \
-          --grep='^feat:' \
-          --grep='^fix:' \
-          --grep='^docs:' \
-          --grep='^style:' \
-          --grep='^refactor:' \
-          --grep='^perf:' \
-          --grep='^test:' \
-          --grep='^revert:' \
-          --grep='^chore:' | awk 'END{print NR}')
-        echo "steps.changes.outputs.count = $COUNT"
-        echo "::set-output name=count::$COUNT"
     - name: Bump version and push tag
       id: tag_version
       uses: mathieudutour/github-tag-action@v6.0
