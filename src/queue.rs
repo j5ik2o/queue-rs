@@ -207,18 +207,6 @@ impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
     }
   }
 }
-//
-// pub fn create_by_traits<T: Element + 'static, Q: QueueBehavior<T>>(
-//     queue_type: QueueType,
-//     num_elements: Option<usize>,
-// ) -> Q {
-//     match (queue_type, num_elements) {
-//         (QueueType::Vec, None) => QueueVec::new(),
-//         (QueueType::Vec, Some(num)) => QueueVec::with_num_elements(num),
-//         (QueueType::MPSC, None) => QueueMPSC::new(),
-//         (QueueType::MPSC, Some(num)) => QueueMPSC::with_num_elements(num),
-//     }
-// }
 
 pub fn create<T: Element + 'static>(
   queue_type: QueueType,
