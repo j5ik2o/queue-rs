@@ -21,7 +21,7 @@ jobs:
     - name: set version
       id: version
       run: |
-        VERSION=$(echo ${{ steps.tag_version.outputs.new_tag }}) | sed 's/^v//')
+        VERSION=$(echo '${{ steps.tag_version.outputs.new_tag }}' | sed 's/^v//')
         echo "::set-output name=version::$VERSION"
     - uses: ciiiii/toml-editor@1.0.0
       with:
