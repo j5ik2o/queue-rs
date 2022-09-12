@@ -6,14 +6,14 @@ use crate::queue::{Element, QueueBehavior, QueueError, QueueSize};
 use anyhow::Result;
 
 #[derive(Debug, Clone)]
-pub struct QueueMPSCInner<E> {
+pub struct QueueMPSC<E> {
   rx: Arc<Mutex<Receiver<E>>>,
   tx: Sender<E>,
   count: Arc<Mutex<QueueSize>>,
   capacity: Arc<Mutex<QueueSize>>,
 }
 
-impl<E: Element + 'static> QueueBehavior<E> for QueueMPSCInner<E> {
+impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
   fn len(&self) -> QueueSize {
     let count_guard = self.count.lock().unwrap();
     count_guard.clone()
@@ -49,7 +49,7 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueMPSCInner<E> {
   }
 }
 
-impl<E: Element + 'static> QueueMPSCInner<E> {
+impl<E: Element + 'static> QueueMPSC<E> {
   pub fn new() -> Self {
     let (tx, rx) = channel();
     Self {

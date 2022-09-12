@@ -6,12 +6,12 @@ use anyhow::Result;
 use crate::queue::{QueueSize, QueueBehavior, QueueError, HasPeekBehavior, Element};
 
 #[derive(Debug, Clone)]
-pub struct QueueVecInner<E> {
+pub struct QueueVec<E> {
   values: VecDeque<E>,
   pub(crate) capacity: QueueSize,
 }
 
-impl<E> QueueVecInner<E> {
+impl<E> QueueVec<E> {
   pub fn new() -> Self {
     Self {
       values: VecDeque::new(),
@@ -36,7 +36,7 @@ impl<E> QueueVecInner<E> {
   }
 }
 
-impl<E: Element + 'static> QueueBehavior<E> for QueueVecInner<E> {
+impl<E: Element + 'static> QueueBehavior<E> for QueueVec<E> {
   fn len(&self) -> QueueSize {
     QueueSize::Limited(self.values.len())
   }
@@ -59,7 +59,7 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueVecInner<E> {
   }
 }
 
-impl<E: Element + 'static> HasPeekBehavior<E> for QueueVecInner<E> {
+impl<E: Element + 'static> HasPeekBehavior<E> for QueueVec<E> {
   fn peek(&self) -> Result<Option<E>> {
     Ok(self.values.front().map(|e| e.clone()))
   }
