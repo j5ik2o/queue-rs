@@ -36,7 +36,7 @@ jobs:
         git config --global user.name "Junichi Kato"
         git diff
         git add .
-        git commit -m 'build: version up'
+        git commit -m 'build: version up to ${{ steps.version.outputs.version }}'
         git push origin main
         COMMIT_SHA=$(git rev-parse HEAD)
         echo "::set-output name=commit_sha::$COMMIT_SHA"
