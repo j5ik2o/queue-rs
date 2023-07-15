@@ -10,7 +10,7 @@ readme = "README.md"
 repository = "https://github.com/j5ik2o/queue-rs"
 
 [dependencies]
-anyhow = "1.0.71"
+anyhow = "1.0.72"
 thiserror = "1.0.43"
 log = "0.4"
 
