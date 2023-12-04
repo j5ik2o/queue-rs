@@ -322,4 +322,52 @@ mod tests {
 
     handler1.join().unwrap();
   }
+
+  #[test]
+  pub fn test_blocking_take() {
+    let size: usize = 10;
+    let mut bqv1 = create_queue::<i32>(QueueType::Vec, Some(size)).with_blocking();
+    for i in 0..size {
+      bqv1.offer(i as i32).unwrap();
+    }
+
+    let mut bqv2 = bqv1.clone();
+
+    let please_interrupt = CountDownLatch::new(1);
+    let please_interrupt_cloned = please_interrupt.clone();
+
+    let handler1 = thread::spawn(move || {
+      for i in 0..size {
+        log::debug!("take: start: {}", i);
+        let n = bqv2.take().unwrap();
+        log::debug!("take: finish: {},{:?}", i, n);
+      }
+
+      bqv2.interrupt();
+      match bqv2.take() {
+        Ok(_) => {
+          panic!("take: finish: should not be here");
+        }
+        Err(e) => {
+          log::debug!("take: finish: error = {:?}", e);
+        }
+      }
+      assert!(!bqv2.is_interrupted());
+
+      please_interrupt_cloned.countdown();
+      match bqv2.take() {
+        Ok(_) => {
+          panic!("take: finish: should not be here");
+        }
+        Err(e) => {
+          log::debug!("take: finish: error = {:?}", e);
+        }
+      }
+      assert!(!bqv2.is_interrupted());
+    });
+
+    please_interrupt.wait();
+    bqv1.interrupt();
+    handler1.join().unwrap();
+  }
 }
