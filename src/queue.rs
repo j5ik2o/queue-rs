@@ -1,6 +1,3 @@
-#[cfg(test)]
-extern crate env_logger;
-
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -160,6 +157,10 @@ pub trait BlockingQueueBehavior<E: Element>: QueueBehavior<E> + Send {
   /// Retrieve the head of this queue and delete it. If necessary, wait until an element becomes available.<br/>
   /// このキューの先頭を取得して削除します。必要に応じて、要素が利用可能になるまで待機します。
   fn take(&mut self) -> Result<Option<E>>;
+
+  fn interrupt(&mut self);
+
+  fn is_interrupted(&self) -> bool;
 }
 
 pub enum QueueType {
@@ -220,14 +221,13 @@ pub fn create_queue<T: Element + 'static>(queue_type: QueueType, num_elements: O
 
 #[cfg(test)]
 mod tests {
-  use std::thread::sleep;
-  use std::time::Duration;
   use std::{env, thread};
 
   use fp_rust::sync::CountDownLatch;
 
-  use crate::queue::BlockingQueueBehavior;
   use crate::queue::{create_queue, QueueBehavior, QueueType};
+  use crate::queue::{BlockingQueueBehavior, QueueSize};
+  extern crate env_logger;
 
   fn init_logger() {
     env::set_var("RUST_LOG", "debug");
@@ -235,86 +235,91 @@ mod tests {
     let _ = env_logger::try_init();
   }
 
-  fn test_queue_vec<Q>(queue: Q)
-  where
-    Q: QueueBehavior<i32> + Clone + 'static, {
-    let cdl = CountDownLatch::new(1);
-    let cdl2 = cdl.clone();
-
-    let mut q1 = queue;
-    let mut q2 = q1.clone();
-
-    let max = 5;
-
-    let handler1 = thread::spawn(move || {
-      cdl2.countdown();
-      for i in 1..=max {
-        log::debug!("take: start: {}", i);
-        let n = q2.poll();
-        log::debug!("take: finish: {},{:?}", i, n);
-      }
-    });
-
-    cdl.wait();
-
-    let handler2 = thread::spawn(move || {
-      sleep(Duration::from_secs(3));
-
-      for i in 1..=max {
-        log::debug!("put: start: {}", i);
-        q1.offer(i).unwrap();
-        log::debug!("put: finish: {}", i);
-      }
-    });
-
-    handler1.join().unwrap();
-    handler2.join().unwrap();
-  }
-
-  fn test_blocking_queue_vec<Q>(queue: Q)
-  where
-    Q: BlockingQueueBehavior<i32> + Clone + 'static, {
-    let cdl = CountDownLatch::new(1);
-    let cdl2 = cdl.clone();
-
-    let mut bqv1 = queue;
+  #[test]
+  fn test_blocking_put() {
+    let size: usize = 10;
+    let mut bqv1 = create_queue(QueueType::Vec, Some(size)).with_blocking();
     let mut bqv2 = bqv1.clone();
 
-    let max = 5;
+    let please_interrupt = CountDownLatch::new(1);
+    let please_interrupt_cloned = please_interrupt.clone();
 
     let handler1 = thread::spawn(move || {
-      cdl2.countdown();
-      for i in 1..=max {
+      for i in 0..size {
         log::debug!("take: start: {}", i);
-        let n = bqv2.take();
+        let n = bqv2.put(i as i32).unwrap();
         log::debug!("take: finish: {},{:?}", i, n);
       }
-    });
+      assert_eq!(bqv2.len(), QueueSize::Limited(size));
 
-    cdl.wait();
-
-    let handler2 = thread::spawn(move || {
-      sleep(Duration::from_secs(3));
-
-      for i in 1..=max {
-        log::debug!("put: start: {}", i);
-        bqv1.offer(i).unwrap();
-        log::debug!("put: finish: {}", i);
+      bqv2.interrupt();
+      match bqv2.put(99) {
+        Ok(_) => {
+          panic!("put: finish: 99, should not be here");
+        }
+        Err(e) => {
+          log::debug!("put: finish: 99, error = {:?}", e);
+        }
       }
+      assert!(!bqv2.is_interrupted());
+
+      please_interrupt_cloned.countdown();
+      match bqv2.put(99) {
+        Ok(_) => {
+          panic!("put: finish: 99, should not be here");
+        }
+        Err(e) => {
+          log::debug!("put: finish: 99, error = {:?}", e);
+        }
+      }
+      assert!(!bqv2.is_interrupted());
     });
 
+    please_interrupt.wait();
+    bqv1.interrupt();
     handler1.join().unwrap();
-    handler2.join().unwrap();
   }
 
   #[test]
-  fn test() {
-    init_logger();
+  fn test_put_with_take() {
+    let capacity = 2;
 
-    let q = create_queue(QueueType::Vec, Some(32));
-    test_queue_vec(q);
+    let mut bqv1 = create_queue(QueueType::Vec, Some(capacity)).with_blocking();
+    let mut bqv2 = bqv1.clone();
 
-    let bq = create_queue(QueueType::Vec, Some(32)).with_blocking();
-    test_blocking_queue_vec(bq);
+    let please_take = CountDownLatch::new(1);
+    let please_take_cloned = please_take.clone();
+    let please_interrupt = CountDownLatch::new(1);
+    let please_interrupt_cloned = please_interrupt.clone();
+
+    let handler1 = thread::spawn(move || {
+      for i in 0..capacity {
+        log::debug!("take: start: {}", i);
+        let n = bqv2.put(i);
+        log::debug!("take: finish: {},{:?}", i, n);
+      }
+      please_take_cloned.countdown();
+      bqv2.put(86).unwrap();
+
+      please_interrupt_cloned.countdown();
+      match bqv2.put(99) {
+        Ok(_) => {
+          panic!("put: finish: 99, should not be here");
+        }
+        Err(e) => {
+          log::debug!("put: finish: 99, error = {:?}", e);
+        }
+      }
+    });
+
+    please_take.wait();
+
+    let r = bqv1.take().unwrap();
+    assert_eq!(r, Some(0));
+
+    please_interrupt.wait();
+    bqv1.interrupt();
+
+    handler1.join().unwrap();
   }
 }
