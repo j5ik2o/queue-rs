@@ -151,6 +151,10 @@ pub trait HasPeekBehavior<E: Element>: QueueBehavior<E> {
   fn peek(&self) -> Result<Option<E>>;
 }
 
+pub trait HasContainsBehavior<E: Element>: QueueBehavior<E> {
+  fn contains(&self, element: &E) -> Result<bool>;
+}
+
 pub trait BlockingQueueBehavior<E: Element>: QueueBehavior<E> + Send {
   /// Inserts the specified element into this queue. If necessary, waits until space is available.<br/>
   /// 指定された要素をこのキューに挿入します。必要に応じて、空きが生じるまで待機します。
@@ -212,6 +216,24 @@ impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
     match self {
       Queue::Vec(inner) => inner.poll(),
       Queue::MPSC(inner) => inner.poll(),
+    }
+  }
+}
+
+impl<E: Element + 'static> HasPeekBehavior<E> for Queue<E> {
+  fn peek(&self) -> Result<Option<E>> {
+    match self {
+      Queue::Vec(inner) => inner.peek(),
+      Queue::MPSC(inner) => panic!("Not implemented yet."),
+    }
+  }
+}
+
+impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for Queue<E> {
+  fn contains(&self, element: &E) -> Result<bool> {
+    match self {
+      Queue::Vec(inner) => inner.contains(element),
+      Queue::MPSC(inner) => panic!("Not implemented yet."),
     }
   }
 }

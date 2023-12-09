@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 
-use crate::queue::{Element, HasPeekBehavior, QueueBehavior, QueueError, QueueSize};
+use crate::queue::{Element, HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueError, QueueSize};
 
 #[derive(Debug, Clone)]
 pub struct QueueVec<E> {
@@ -68,5 +68,12 @@ impl<E: Element + 'static> HasPeekBehavior<E> for QueueVec<E> {
   fn peek(&self) -> Result<Option<E>> {
     let mg = self.values.lock().unwrap();
     Ok(mg.front().map(|e| e.clone()))
+  }
+}
+
+impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for QueueVec<E> {
+  fn contains(&self, element: &E) -> Result<bool> {
+    let mg = self.values.lock().unwrap();
+    Ok(mg.contains(element))
   }
 }

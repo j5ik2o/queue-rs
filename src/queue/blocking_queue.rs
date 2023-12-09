@@ -5,7 +5,9 @@ use std::sync::{Arc, Condvar, Mutex};
 
 use anyhow::Result;
 
-use crate::queue::{BlockingQueueBehavior, Element, HasPeekBehavior, QueueBehavior, QueueError, QueueSize};
+use crate::queue::{
+  BlockingQueueBehavior, Element, HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueError, QueueSize,
+};
 
 #[derive(Debug, Clone)]
 pub struct BlockingQueue<E, Q: QueueBehavior<E>> {
@@ -50,6 +52,17 @@ impl<E: Element + 'static, Q: QueueBehavior<E> + HasPeekBehavior<E>> HasPeekBeha
     let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     let result = queue_vec_mutex_guard.peek();
     not_full.notify_one();
+    result
+  }
+}
+
+impl<E: Element + 'static, Q: QueueBehavior<E> + HasContainsBehavior<E>> HasContainsBehavior<E>
+  for BlockingQueue<E, Q>
+{
+  fn contains(&self, element: &E) -> Result<bool> {
+    let (queue_vec_mutex, not_full, _) = &*self.underlying;
+    let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    let result = queue_vec_mutex_guard.contains(element);
     result
   }
 }
@@ -127,7 +140,7 @@ mod tests {
   use std::sync::{Arc, Condvar, Mutex};
   use std::{env, thread};
 
-  use crate::queue::{create_queue, QueueBehavior, QueueType};
+  use crate::queue::{create_queue, HasContainsBehavior, QueueBehavior, QueueType};
   use crate::queue::{BlockingQueueBehavior, QueueSize};
   extern crate env_logger;
 
@@ -166,11 +179,35 @@ mod tests {
     }
   }
 
+  const QUEUE_SIZE: usize = 10;
+
+  #[test]
+  #[serial]
+  fn test_offer() {
+    init_logger();
+    let mut q = create_queue(QueueType::Vec, Some(1)).with_blocking();
+    assert!(q.offer(0).is_ok());
+    assert!(q.offer(1).is_err());
+  }
+
+  #[test]
+  #[serial]
+  fn test_put() {
+    init_logger();
+    let size: usize = QUEUE_SIZE;
+
+    let mut q = create_queue(QueueType::Vec, Some(size)).with_blocking();
+    for i in 0..size {
+      q.put(i as i32).unwrap();
+      assert!(q.contains(&(i as i32)).unwrap());
+    }
+  }
+
   #[test]
   #[serial]
   fn test_blocking_put() {
     init_logger();
-    let size: usize = 10;
+    let size: usize = QUEUE_SIZE;
     let mut bqv1 = create_queue(QueueType::Vec, Some(size)).with_blocking();
     let mut bqv2 = bqv1.clone();
 
@@ -262,7 +299,7 @@ mod tests {
   #[serial]
   pub fn test_blocking_take() {
     init_logger();
-    let size: usize = 10;
+    let size: usize = QUEUE_SIZE;
     let mut bqv1 = create_queue::<i32>(QueueType::Vec, Some(size)).with_blocking();
     for i in 0..size {
       bqv1.offer(i as i32).unwrap();
