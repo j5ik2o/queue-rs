@@ -227,9 +227,9 @@ pub fn create_queue<T: Element + 'static>(queue_type: QueueType, num_elements: O
 
 #[cfg(test)]
 mod tests {
+  use serial_test::serial;
+  use std::sync::{Arc, Condvar, Mutex};
   use std::{env, thread};
-
-  use fp_rust::sync::CountDownLatch;
 
   use crate::queue::{create_queue, QueueBehavior, QueueType};
   use crate::queue::{BlockingQueueBehavior, QueueSize};
@@ -241,13 +241,44 @@ mod tests {
     let _ = env_logger::try_init();
   }
 
+  struct CountDownLatch {
+    count: Mutex<usize>,
+    condvar: Condvar,
+  }
+
+  impl CountDownLatch {
+    fn new(count: usize) -> Self {
+      CountDownLatch {
+        count: Mutex::new(count),
+        condvar: Condvar::new(),
+      }
+    }
+
+    fn count_down(&self) {
+      let mut count = self.count.lock().unwrap();
+      *count -= 1;
+      if *count == 0 {
+        self.condvar.notify_all();
+      }
+    }
+
+    fn wait(&self) {
+      let mut count = self.count.lock().unwrap();
+      while *count > 0 {
+        count = self.condvar.wait(count).unwrap();
+      }
+    }
+  }
+
   #[test]
+  #[serial]
   fn test_blocking_put() {
+    init_logger();
     let size: usize = 10;
     let mut bqv1 = create_queue(QueueType::Vec, Some(size)).with_blocking();
     let mut bqv2 = bqv1.clone();
 
-    let please_interrupt = CountDownLatch::new(1);
+    let please_interrupt = Arc::new(CountDownLatch::new(1));
     let please_interrupt_cloned = please_interrupt.clone();
 
     let handler1 = thread::spawn(move || {
@@ -269,7 +300,7 @@ mod tests {
       }
       assert!(!bqv2.is_interrupted());
 
-      please_interrupt_cloned.countdown();
+      please_interrupt_cloned.count_down();
       match bqv2.put(99) {
         Ok(_) => {
           panic!("put: finish: 99, should not be here");
@@ -287,15 +318,17 @@ mod tests {
   }
 
   #[test]
+  #[serial]
   fn test_put_with_take() {
+    init_logger();
     let capacity = 2;
 
     let mut bqv1 = create_queue(QueueType::Vec, Some(capacity)).with_blocking();
     let mut bqv2 = bqv1.clone();
 
-    let please_take = CountDownLatch::new(1);
+    let please_take = Arc::new(CountDownLatch::new(1));
     let please_take_cloned = please_take.clone();
-    let please_interrupt = CountDownLatch::new(1);
+    let please_interrupt = Arc::new(CountDownLatch::new(1));
     let please_interrupt_cloned = please_interrupt.clone();
 
     let handler1 = thread::spawn(move || {
@@ -304,10 +337,10 @@ mod tests {
         let n = bqv2.put(i);
         log::debug!("take: finish: {},{:?}", i, n);
       }
-      please_take_cloned.countdown();
+      please_take_cloned.count_down();
       bqv2.put(86).unwrap();
 
-      please_interrupt_cloned.countdown();
+      please_interrupt_cloned.count_down();
       match bqv2.put(99) {
         Ok(_) => {
           panic!("put: finish: 99, should not be here");
@@ -330,7 +363,9 @@ mod tests {
   }
 
   #[test]
+  #[serial]
   pub fn test_blocking_take() {
+    init_logger();
     let size: usize = 10;
     let mut bqv1 = create_queue::<i32>(QueueType::Vec, Some(size)).with_blocking();
     for i in 0..size {
@@ -339,7 +374,7 @@ mod tests {
 
     let mut bqv2 = bqv1.clone();
 
-    let please_interrupt = CountDownLatch::new(1);
+    let please_interrupt = Arc::new(CountDownLatch::new(1));
     let please_interrupt_cloned = please_interrupt.clone();
 
     let handler1 = thread::spawn(move || {
@@ -360,7 +395,7 @@ mod tests {
       }
       assert!(!bqv2.is_interrupted());
 
-      please_interrupt_cloned.countdown();
+      please_interrupt_cloned.count_down();
       match bqv2.take() {
         Ok(_) => {
           panic!("take: finish: should not be here");

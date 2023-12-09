@@ -59,7 +59,7 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
     let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
     let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     while queue_vec_mutex_guard.is_full() {
-      if self.update_interrupted() {
+      if self.check_and_update_interrupted() {
         return Err(QueueError::<E>::InterruptedError.into());
       }
       log::debug!("put: blocking start...");
@@ -75,7 +75,8 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
     let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
     let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     while queue_vec_mutex_guard.is_empty() {
-      if self.update_interrupted() {
+      if self.check_and_update_interrupted() {
+        log::debug!("take: return by interrupted");
         return Err(QueueError::<E>::InterruptedError.into());
       }
       log::debug!("take: blocking start...");
@@ -88,10 +89,11 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
   }
 
   fn interrupt(&mut self) {
+    log::debug!("interrupting...");
     self.is_interrupted.store(true, Ordering::Relaxed);
     let (_, not_full, not_empty) = &*self.underlying;
-    not_empty.notify_all();
-    not_full.notify_all();
+    not_empty.notify_one();
+    not_full.notify_one();
   }
 
   fn is_interrupted(&self) -> bool {
@@ -108,7 +110,7 @@ impl<E, Q: QueueBehavior<E>> BlockingQueue<E, Q> {
     }
   }
 
-  fn update_interrupted(&self) -> bool {
+  fn check_and_update_interrupted(&self) -> bool {
     match self
       .is_interrupted
       .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
