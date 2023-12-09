@@ -51,6 +51,8 @@ pub enum QueueError<E> {
   PoolError,
   #[error("Failed to peek an element")]
   PeekError,
+  #[error("Failed to contains an element")]
+  ContainsError,
   #[error("Failed to interrupt")]
   InterruptedError,
 }
@@ -77,6 +79,36 @@ impl QueueSize {
         *c -= 1;
       }
       _ => {}
+    }
+  }
+
+  pub fn is_limitless(&self) -> bool {
+    match self {
+      QueueSize::Limitless => true,
+      _ => false,
+    }
+  }
+
+  pub fn to_option(&self) -> Option<usize> {
+    match self {
+      QueueSize::Limitless => None,
+      QueueSize::Limited(c) => Some(*c),
+    }
+  }
+
+  pub fn unwrap(&self) -> usize {
+    match self {
+      QueueSize::Limitless => panic!("Cannot unwrap a limitless queue size."),
+      QueueSize::Limited(c) => *c,
+    }
+  }
+
+  pub fn get_or_else<F>(&self, default: F) -> usize
+  where
+    F: FnOnce() -> usize, {
+    match self {
+      QueueSize::Limitless => default(),
+      QueueSize::Limited(c) => *c,
     }
   }
 }
@@ -164,6 +196,8 @@ pub trait BlockingQueueBehavior<E: Element>: QueueBehavior<E> + Send {
   /// このキューの先頭を取得して削除します。必要に応じて、要素が利用可能になるまで待機します。
   fn take(&mut self) -> Result<Option<E>>;
 
+  fn remaining_capacity(&self) -> QueueSize;
+
   /// Interrupts the operation of this queue.<br/>
   /// このキューの操作を中断します。
   fn interrupt(&mut self);
@@ -224,7 +258,7 @@ impl<E: Element + 'static> HasPeekBehavior<E> for Queue<E> {
   fn peek(&self) -> Result<Option<E>> {
     match self {
       Queue::Vec(inner) => inner.peek(),
-      Queue::MPSC(inner) => panic!("Not implemented yet."),
+      Queue::MPSC(_) => panic!("Not supported implementation."),
     }
   }
 }
@@ -233,7 +267,7 @@ impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for Queue<E> {
   fn contains(&self, element: &E) -> Result<bool> {
     match self {
       Queue::Vec(inner) => inner.contains(element),
-      Queue::MPSC(inner) => panic!("Not implemented yet."),
+      Queue::MPSC(_) => panic!("Not supported implementation."),
     }
   }
 }
