@@ -24,14 +24,14 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
     capacity_guard.clone()
   }
 
-  fn offer(&mut self, e: E) -> anyhow::Result<()> {
+  fn offer(&mut self, e: E) -> Result<()> {
     match self.tx.send(e) {
       Ok(_) => {
         let mut count_guard = self.count.lock().unwrap();
         count_guard.increment();
         Ok(())
       }
-      Err(SendError(e)) => Err(anyhow::Error::new(QueueError::OfferError(e))),
+      Err(SendError(e)) => Err(QueueError::OfferError(e).into()),
     }
   }
 
@@ -44,7 +44,7 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
         Ok(Some(e))
       }
       Err(TryRecvError::Empty) => Ok(None),
-      Err(TryRecvError::Disconnected) => Err(anyhow::Error::new(QueueError::<E>::PoolError)),
+      Err(TryRecvError::Disconnected) => Err(QueueError::<E>::PoolError.into()),
     }
   }
 }

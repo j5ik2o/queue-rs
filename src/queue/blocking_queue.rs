@@ -5,7 +5,7 @@ use std::sync::{Arc, Condvar, Mutex};
 
 use anyhow::Result;
 
-use crate::queue::{BlockingQueueBehavior, Element, QueueBehavior, QueueSize};
+use crate::queue::{BlockingQueueBehavior, Element, HasPeekBehavior, QueueBehavior, QueueError, QueueSize};
 
 #[derive(Debug, Clone)]
 pub struct BlockingQueue<E, Q: QueueBehavior<E>> {
@@ -42,14 +42,16 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> QueueBehavior<E> for BlockingQue
     not_full.notify_one();
     result
   }
+}
 
-  // fn peek(&self) -> Result<Option<E>> {
-  //   let (queue_vec_mutex, not_full, _) = &*self.underlying;
-  //   let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
-  //   let result = queue_vec_mutex_guard.peek();
-  //   not_full.notify_one();
-  //   result
-  // }
+impl<E: Element + 'static, Q: QueueBehavior<E> + HasPeekBehavior<E>> HasPeekBehavior<E> for BlockingQueue<E, Q> {
+  fn peek(&self) -> Result<Option<E>> {
+    let (queue_vec_mutex, not_full, _) = &*self.underlying;
+    let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    let result = queue_vec_mutex_guard.peek();
+    not_full.notify_one();
+    result
+  }
 }
 
 impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for BlockingQueue<E, Q> {
@@ -57,17 +59,8 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
     let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
     let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     while queue_vec_mutex_guard.is_full() {
-      match self
-        .is_interrupted
-        .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
-      {
-        Ok(_) => {
-          // 中断されたときの処理
-          return Err(anyhow::anyhow!("interrupted"));
-        }
-        Err(_) => {
-          // 中断されていないときの処理
-        }
+      if self.update_interrupted() {
+        return Err(QueueError::<E>::InterruptedError.into());
       }
       log::debug!("put: blocking start...");
       queue_vec_mutex_guard = not_full.wait(queue_vec_mutex_guard).unwrap();
@@ -82,17 +75,8 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
     let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
     let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     while queue_vec_mutex_guard.is_empty() {
-      match self
-        .is_interrupted
-        .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
-      {
-        Ok(_) => {
-          // 中断されたときの処理
-          return Err(anyhow::anyhow!("interrupted"));
-        }
-        Err(_) => {
-          // 中断されていないときの処理
-        }
+      if self.update_interrupted() {
+        return Err(QueueError::<E>::InterruptedError.into());
       }
       log::debug!("take: blocking start...");
       queue_vec_mutex_guard = not_empty.wait(queue_vec_mutex_guard).unwrap();
@@ -121,6 +105,16 @@ impl<E, Q: QueueBehavior<E>> BlockingQueue<E, Q> {
       underlying: Arc::new((Mutex::new(queue), Condvar::new(), Condvar::new())),
       p: PhantomData::default(),
       is_interrupted: Arc::new(AtomicBool::new(false)),
+    }
+  }
+
+  fn update_interrupted(&self) -> bool {
+    match self
+      .is_interrupted
+      .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
+    {
+      Ok(_) => true,
+      Err(_) => false,
     }
   }
 }

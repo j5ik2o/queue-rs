@@ -51,6 +51,8 @@ pub enum QueueError<E> {
   PoolError,
   #[error("Failed to peek an element")]
   PeekError,
+  #[error("Failed to interrupt")]
+  InterruptedError,
 }
 
 #[derive(Debug, Clone)]
@@ -158,8 +160,12 @@ pub trait BlockingQueueBehavior<E: Element>: QueueBehavior<E> + Send {
   /// このキューの先頭を取得して削除します。必要に応じて、要素が利用可能になるまで待機します。
   fn take(&mut self) -> Result<Option<E>>;
 
+  /// Interrupts the operation of this queue.<br/>
+  /// このキューの操作を中断します。
   fn interrupt(&mut self);
 
+  /// Returns whether the operation of this queue has been interrupted.<br/>
+  /// このキューの操作が中断されたかどうかを返します。
   fn is_interrupted(&self) -> bool;
 }
 

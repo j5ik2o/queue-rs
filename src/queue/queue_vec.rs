@@ -54,7 +54,7 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueVec<E> {
       mg.push_back(e);
       Ok(())
     } else {
-      Err(anyhow::Error::new(QueueError::OfferError(e)))
+      Err(QueueError::OfferError(e).into())
     }
   }
 
