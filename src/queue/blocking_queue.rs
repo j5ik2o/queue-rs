@@ -196,6 +196,23 @@ mod tests {
 
   #[test]
   #[serial]
+  fn test_empty_full() {
+    init_logger();
+    let size: usize = QUEUE_SIZE;
+    let mut q = create_queue::<i32>(QueueType::Vec, Some(2)).with_blocking();
+
+    assert!(q.is_empty());
+    assert_eq!(2, q.remaining_capacity().unwrap());
+    assert!(q.offer(1).is_ok());
+    assert!(!q.is_empty());
+    assert!(q.offer(2).is_ok());
+    assert!(!q.is_empty());
+    assert_eq!(0, q.remaining_capacity().unwrap());
+    assert!(q.offer(3).is_err());
+  }
+
+  #[test]
+  #[serial]
   fn test_remaining_capacity() {
     init_logger();
     let size: usize = QUEUE_SIZE;
