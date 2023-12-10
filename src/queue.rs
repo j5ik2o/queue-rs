@@ -96,9 +96,9 @@ impl QueueSize {
     }
   }
 
-  pub fn unwrap(&self) -> usize {
+  pub fn to_usize(&self) -> usize {
     match self {
-      QueueSize::Limitless => panic!("Cannot unwrap a limitless queue size."),
+      QueueSize::Limitless => usize::MAX,
       QueueSize::Limited(c) => *c,
     }
   }
@@ -272,11 +272,11 @@ impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for Queue<E> {
   }
 }
 
-pub fn create_queue<T: Element + 'static>(queue_type: QueueType, num_elements: Option<usize>) -> Queue<T> {
+pub fn create_queue<T: Element + 'static>(queue_type: QueueType, num_elements: QueueSize) -> Queue<T> {
   match (queue_type, num_elements) {
-    (QueueType::Vec, None) => Queue::Vec(QueueVec::<T>::new()),
-    (QueueType::Vec, Some(num)) => Queue::Vec(QueueVec::<T>::with_num_elements(num)),
-    (QueueType::MPSC, None) => Queue::MPSC(QueueMPSC::<T>::new()),
-    (QueueType::MPSC, Some(num)) => Queue::MPSC(QueueMPSC::<T>::with_num_elements(num)),
+    (QueueType::Vec, QueueSize::Limitless) => Queue::Vec(QueueVec::<T>::new()),
+    (QueueType::Vec, QueueSize::Limited(num)) => Queue::Vec(QueueVec::<T>::with_num_elements(num)),
+    (QueueType::MPSC, QueueSize::Limitless) => Queue::MPSC(QueueMPSC::<T>::new()),
+    (QueueType::MPSC, QueueSize::Limited(num)) => Queue::MPSC(QueueMPSC::<T>::with_num_elements(num)),
   }
 }
