@@ -199,7 +199,7 @@ mod tests {
   #[serial]
   fn test_constructor1() {
     init_logger();
-    let q = create_queue::<i32>(QueueType::Vec, QUEUE_SIZE).with_blocking();
+    let q = create_blocking_queue(QueueType::Vec, QUEUE_SIZE);
     assert_eq!(QUEUE_SIZE, q.remaining_capacity());
   }
 
@@ -207,7 +207,7 @@ mod tests {
   #[serial]
   fn test_constructor2() {
     init_logger();
-    let q = create_queue::<i32>(QueueType::Vec, QueueSize::Limitless).with_blocking();
+    let q = create_blocking_queue(QueueType::Vec, QueueSize::Limitless);
     assert_eq!(QueueSize::Limitless, q.remaining_capacity());
   }
 
