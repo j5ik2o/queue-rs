@@ -48,13 +48,13 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueVec<E> {
     self.capacity.clone()
   }
 
-  fn offer(&mut self, e: E) -> Result<()> {
+  fn offer(&mut self, element: E) -> Result<()> {
     if self.non_full() {
       let mut mg = self.values.lock().unwrap();
-      mg.push_back(e);
+      mg.push_back(element);
       Ok(())
     } else {
-      Err(QueueError::OfferError(e).into())
+      Err(QueueError::OfferError(element).into())
     }
   }
 
@@ -72,8 +72,8 @@ impl<E: Element + 'static> HasPeekBehavior<E> for QueueVec<E> {
 }
 
 impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for QueueVec<E> {
-  fn contains(&self, element: &E) -> Result<bool> {
+  fn contains(&self, element: &E) -> bool {
     let mg = self.values.lock().unwrap();
-    Ok(mg.contains(element))
+    mg.contains(element)
   }
 }

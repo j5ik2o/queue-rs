@@ -24,24 +24,24 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
     capacity_guard.clone()
   }
 
-  fn offer(&mut self, e: E) -> Result<()> {
-    match self.tx.send(e) {
+  fn offer(&mut self, element: E) -> Result<()> {
+    match self.tx.send(element) {
       Ok(_) => {
         let mut count_guard = self.count.lock().unwrap();
         count_guard.increment();
         Ok(())
       }
-      Err(SendError(e)) => Err(QueueError::OfferError(e).into()),
+      Err(SendError(err)) => Err(QueueError::OfferError(err).into()),
     }
   }
 
   fn poll(&mut self) -> Result<Option<E>> {
     let receiver_guard = self.rx.lock().unwrap();
     match receiver_guard.try_recv() {
-      Ok(e) => {
+      Ok(element) => {
         let mut count_guard = self.count.lock().unwrap();
         count_guard.decrement();
-        Ok(Some(e))
+        Ok(Some(element))
       }
       Err(TryRecvError::Empty) => Ok(None),
       Err(TryRecvError::Disconnected) => Err(QueueError::<E>::PoolError.into()),

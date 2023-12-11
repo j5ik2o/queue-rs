@@ -29,10 +29,18 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> QueueBehavior<E> for BlockingQue
     queue_vec_mutex_guard.capacity()
   }
 
-  fn offer(&mut self, e: E) -> Result<()> {
+  fn offer(&mut self, elements: E) -> Result<()> {
     let (queue_vec_mutex, _, not_empty) = &*self.underlying;
     let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
-    let result = queue_vec_mutex_guard.offer(e);
+    let result = queue_vec_mutex_guard.offer(elements);
+    not_empty.notify_one();
+    result
+  }
+
+  fn offer_all(&mut self, elements: impl IntoIterator<Item = E>) -> Result<()> {
+    let (queue_vec_mutex, _, not_empty) = &*self.underlying;
+    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    let result = queue_vec_mutex_guard.offer_all(elements);
     not_empty.notify_one();
     result
   }
@@ -59,7 +67,7 @@ impl<E: Element + 'static, Q: QueueBehavior<E> + HasPeekBehavior<E>> HasPeekBeha
 impl<E: Element + 'static, Q: QueueBehavior<E> + HasContainsBehavior<E>> HasContainsBehavior<E>
   for BlockingQueue<E, Q>
 {
-  fn contains(&self, element: &E) -> Result<bool> {
+  fn contains(&self, element: &E) -> bool {
     let (queue_vec_mutex, _, _) = &*self.underlying;
     let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     let result = queue_vec_mutex_guard.contains(element);
@@ -68,7 +76,7 @@ impl<E: Element + 'static, Q: QueueBehavior<E> + HasContainsBehavior<E>> HasCont
 }
 
 impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for BlockingQueue<E, Q> {
-  fn put(&mut self, e: E) -> Result<()> {
+  fn put(&mut self, elements: E) -> Result<()> {
     let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
     let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     while queue_vec_mutex_guard.is_full() {
@@ -80,7 +88,7 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
       queue_vec_mutex_guard = not_full.wait(queue_vec_mutex_guard).unwrap();
       // log::debug!("put: blocking end...");
     }
-    let result = queue_vec_mutex_guard.offer(e);
+    let result = queue_vec_mutex_guard.offer(elements);
     not_empty.notify_one();
     result
   }
@@ -149,12 +157,14 @@ impl<E, Q: QueueBehavior<E>> BlockingQueue<E, Q> {
 
 #[cfg(test)]
 mod tests {
-  use super::*;
-  use serial_test::serial;
   use std::sync::{Arc, Condvar, Mutex};
   use std::{env, thread};
 
+  use serial_test::serial;
+
   use crate::queue::{create_queue, BlockingQueue, HasContainsBehavior, Queue, QueueBehavior, QueueType};
+
+  use super::*;
 
   extern crate env_logger;
 
@@ -199,16 +209,18 @@ mod tests {
   #[serial]
   fn test_constructor1() {
     init_logger();
-    let q = create_blocking_queue(QueueType::Vec, QUEUE_SIZE);
-    assert_eq!(QUEUE_SIZE, q.remaining_capacity());
+    let mut q = create_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    assert_eq!(q.remaining_capacity(), QUEUE_SIZE);
+    assert_eq!(q.poll().unwrap(), None);
   }
 
   #[test]
   #[serial]
   fn test_constructor2() {
     init_logger();
-    let q = create_blocking_queue(QueueType::Vec, QueueSize::Limitless);
+    let mut q = create_blocking_queue(QueueType::Vec, QueueSize::Limitless);
     assert_eq!(QueueSize::Limitless, q.remaining_capacity());
+    assert_eq!(q.poll().unwrap(), None);
   }
 
   #[test]
@@ -217,13 +229,17 @@ mod tests {
     init_logger();
     let mut q = create_blocking_queue(QueueType::Vec, QueueSize::Limited(2));
     assert!(q.is_empty());
-    assert_eq!(2, q.remaining_capacity().to_usize());
+    assert_eq!(q.remaining_capacity().to_usize(), 2);
     assert!(q.offer(1).is_ok());
     assert!(!q.is_empty());
     assert!(q.offer(2).is_ok());
     assert!(!q.is_empty());
-    assert_eq!(0, q.remaining_capacity().to_usize());
+    assert_eq!(q.remaining_capacity().to_usize(), 0);
     assert!(q.offer(3).is_err());
+
+    assert_eq!(q.poll().unwrap(), Some(1));
+    assert_eq!(q.poll().unwrap(), Some(2));
+    assert_eq!(q.poll().unwrap(), None);
   }
 
   #[test]
@@ -235,16 +251,20 @@ mod tests {
       let remaining_capacity = q.remaining_capacity().to_usize();
       let len = q.len().to_usize();
       assert_eq!(remaining_capacity, i);
-      assert_eq!(QUEUE_SIZE.to_usize(), len + remaining_capacity);
+      assert_eq!(len + remaining_capacity, QUEUE_SIZE.to_usize());
       assert!(q.take().is_ok());
     }
     for i in 0..QUEUE_SIZE.to_usize() {
       let remaining_capacity = q.remaining_capacity().to_usize();
       let len = q.len().to_usize();
       assert_eq!(remaining_capacity, QUEUE_SIZE.to_usize() - i);
-      assert_eq!(QUEUE_SIZE.to_usize(), len + remaining_capacity);
+      assert_eq!(len + remaining_capacity, QUEUE_SIZE.to_usize());
       assert!(q.offer(i as i32).is_ok());
     }
+    for i in 0..QUEUE_SIZE.to_usize() {
+      assert_eq!(q.poll().unwrap(), Some(i as i32));
+    }
+    assert_eq!(q.poll().unwrap(), None);
   }
 
   #[test]
@@ -254,6 +274,26 @@ mod tests {
     let mut q = create_blocking_queue(QueueType::Vec, QueueSize::Limited(1));
     assert!(q.offer(0).is_ok());
     assert!(q.offer(1).is_err());
+
+    assert_eq!(q.poll().unwrap(), Some(0));
+    assert_eq!(q.poll().unwrap(), None);
+  }
+
+  #[test]
+  #[serial]
+  fn test_offer_all() {
+    init_logger();
+    let mut q = create_blocking_queue(QueueType::Vec, QueueSize::Limited(10));
+    let v = [1, 2, 3, 4, 5];
+
+    assert!(q.offer_all(v).is_ok());
+
+    assert_eq!(q.poll().unwrap(), Some(1));
+    assert_eq!(q.poll().unwrap(), Some(2));
+    assert_eq!(q.poll().unwrap(), Some(3));
+    assert_eq!(q.poll().unwrap(), Some(4));
+    assert_eq!(q.poll().unwrap(), Some(5));
+    assert_eq!(q.poll().unwrap(), None);
   }
 
   #[test]
@@ -263,7 +303,7 @@ mod tests {
     let mut q = create_blocking_queue(QueueType::Vec, QUEUE_SIZE);
     for i in 0..QUEUE_SIZE.to_usize() {
       q.put(i as i32).unwrap();
-      assert!(q.contains(&(i as i32)).unwrap());
+      assert!(q.contains(&(i as i32)));
     }
   }
 
