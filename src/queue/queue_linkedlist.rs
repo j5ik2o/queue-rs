@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 
 /// A queue implementation backed by a `LinkedList`.<br/>
 /// `LinkedList` で実装されたキュー。
+#[derive(Debug, Clone)]
 pub struct QueueLinkedList<E> {
   values: Arc<Mutex<LinkedList<E>>>,
   pub(crate) capacity: QueueSize,
