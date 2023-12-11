@@ -5,6 +5,8 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 
+/// A queue implementation backed by a `MPSC`.<br/>
+/// `QueueMPSC` で実装されたキュー。
 #[derive(Debug, Clone)]
 pub struct QueueMPSC<E> {
   rx: Arc<Mutex<Receiver<E>>>,

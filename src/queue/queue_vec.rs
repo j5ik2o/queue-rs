@@ -6,6 +6,8 @@ use anyhow::Result;
 
 use crate::queue::{Element, HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueError, QueueSize};
 
+/// A queue implementation backed by a `VecDeque`.<br/>
+/// `VecDeque` で実装されたキュー。
 #[derive(Debug, Clone)]
 pub struct QueueVec<E> {
   values: Arc<Mutex<VecDeque<E>>>,
