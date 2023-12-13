@@ -250,6 +250,7 @@ mod tests {
   }
 
   const QUEUE_SIZE: QueueSize = QueueSize::Limited(10);
+  const TIME_OUT: Duration = Duration::from_millis(100);
 
   #[test]
   #[serial]
@@ -409,7 +410,7 @@ mod tests {
     let capacity = 2;
 
     let mut q1 = create_blocking_queue(QueueType::Vec, QueueSize::Limited(capacity));
-    let mut q2 = q1.clone();
+    let mut q1_cloned = q1.clone();
 
     let please_take = Arc::new(CountDownLatch::new(1));
     let please_take_cloned = please_take.clone();
@@ -418,13 +419,13 @@ mod tests {
 
     let handler1 = thread::spawn(move || {
       for i in 0..capacity {
-        let _ = q2.put(i as i32);
+        let _ = q1_cloned.put(i as i32);
       }
       please_take_cloned.count_down();
-      q2.put(86).unwrap();
+      q1_cloned.put(86).unwrap();
 
       please_interrupt_cloned.count_down();
-      match q2.put(99) {
+      match q1_cloned.put(99) {
         Ok(_) => {
           panic!("put: finish: 99, should not be here");
         }
@@ -449,21 +450,47 @@ mod tests {
 
   #[test]
   #[serial]
+  fn test_timed_offer() {
+    init_logger();
+    let mut q = create_blocking_queue(QueueType::Vec, QueueSize::Limited(2));
+    let mut q_cloned = q.clone();
+    let please_interrupt = Arc::new(CountDownLatch::new(1));
+    let please_interrupt_cloned = please_interrupt.clone();
+
+    let handler1 = thread::spawn(move || {
+      q_cloned.put(1).unwrap();
+      q_cloned.put(2).unwrap();
+      let start_time = std::time::Instant::now();
+      assert!(q_cloned.put_timeout(3, TIME_OUT).is_err());
+      assert!(start_time.elapsed() >= TIME_OUT);
+      please_interrupt_cloned.count_down();
+      let r = q_cloned.put_timeout(4, Duration::from_millis(500));
+      assert!(r.is_err());
+    });
+
+    please_interrupt.wait();
+    assert!(!handler1.is_finished());
+    q.interrupt();
+    handler1.join().unwrap();
+  }
+
+  #[test]
+  #[serial]
   pub fn test_blocking_take() {
     init_logger();
     let mut q1 = populated_queue(QueueType::Vec, QUEUE_SIZE);
-    let mut q2 = q1.clone();
+    let mut q_cloned = q1.clone();
 
     let please_interrupt = Arc::new(CountDownLatch::new(1));
     let please_interrupt_cloned = please_interrupt.clone();
 
     let handler1 = thread::spawn(move || {
       for _ in 0..QUEUE_SIZE.to_usize() {
-        let _ = q2.take().unwrap();
+        let _ = q_cloned.take().unwrap();
       }
 
-      q2.interrupt();
-      match q2.take() {
+      q_cloned.interrupt();
+      match q_cloned.take() {
         Ok(_) => {
           panic!("take: finish: should not be here");
         }
@@ -473,10 +500,10 @@ mod tests {
           assert_eq!(queue_error, &QueueError::InterruptedError);
         }
       }
-      assert!(!q2.is_interrupted());
+      assert!(!q_cloned.is_interrupted());
 
       please_interrupt_cloned.count_down();
-      match q2.take() {
+      match q_cloned.take() {
         Ok(_) => {
           panic!("take: finish: should not be here");
         }
@@ -486,13 +513,50 @@ mod tests {
           assert_eq!(queue_error, &QueueError::InterruptedError);
         }
       }
-      assert!(!q2.is_interrupted());
+      assert!(!q_cloned.is_interrupted());
     });
 
     please_interrupt.wait();
     assert!(!handler1.is_finished());
     q1.interrupt();
     handler1.join().unwrap();
+  }
+
+  #[test]
+  #[serial]
+  fn test_poll() {
+    init_logger();
+    let mut q = populated_queue(QueueType::Vec, QUEUE_SIZE);
+    for i in 0..QUEUE_SIZE.to_usize() {
+      assert_eq!(q.poll().unwrap(), Some(i as i32));
+    }
+    assert_eq!(q.poll().unwrap(), None);
+  }
+
+  #[test]
+  #[serial]
+  fn test_timed_take0() {
+    init_logger();
+    let mut q = populated_queue(QueueType::Vec, QUEUE_SIZE);
+    for i in 0..QUEUE_SIZE.to_usize() {
+      assert_eq!(q.take_timeout(Duration::ZERO).unwrap(), Some(i as i32));
+    }
+    assert!(q.take_timeout(Duration::ZERO).is_err());
+  }
+
+  #[test]
+  #[serial]
+  fn test_timed_take() {
+    init_logger();
+    let mut q = populated_queue(QueueType::Vec, QUEUE_SIZE);
+    for i in 0..QUEUE_SIZE.to_usize() {
+      let start_time = std::time::Instant::now();
+      assert_eq!(q.take_timeout(TIME_OUT).unwrap(), Some(i as i32));
+      assert!(start_time.elapsed() <= TIME_OUT);
+    }
+    let start_time = std::time::Instant::now();
+    assert!(q.take_timeout(TIME_OUT).is_err());
+    assert!(start_time.elapsed() >= TIME_OUT);
   }
 
   fn populated_queue(queue_type: QueueType, size: QueueSize) -> BlockingQueue<i32, Queue<i32>> {
