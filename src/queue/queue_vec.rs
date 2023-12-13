@@ -22,20 +22,17 @@ impl<E: Element> QueueVec<E> {
     }
   }
 
-  pub fn with_num_elements(num_elements: usize) -> Self {
-    Self {
-      values: Arc::new(Mutex::new(VecDeque::new())),
-      capacity: QueueSize::Limited(num_elements),
-    }
+  pub fn with_num_elements(mut self, num_elements: usize) -> Self {
+    self.capacity = QueueSize::Limited(num_elements);
+    self
   }
 
-  pub fn with_elements(values: impl IntoIterator<Item = E> + ExactSizeIterator) -> Self {
+  pub fn with_elements(mut self, values: impl IntoIterator<Item = E> + ExactSizeIterator) -> Self {
     let num_elements = values.len();
     let vec = values.into_iter().collect::<VecDeque<E>>();
-    Self {
-      values: Arc::new(Mutex::new(vec)),
-      capacity: QueueSize::Limited(num_elements),
-    }
+    self.values = Arc::new(Mutex::new(vec));
+    self.capacity = QueueSize::Limited(num_elements);
+    self
   }
 }
 

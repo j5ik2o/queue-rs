@@ -62,13 +62,15 @@ impl<E: Element + 'static> QueueMPSC<E> {
     }
   }
 
-  pub fn with_num_elements(num_elements: usize) -> Self {
-    let (tx, rx) = channel();
-    Self {
-      rx: Arc::new(Mutex::new(rx)),
-      tx,
-      count: Arc::new(Mutex::new(QueueSize::Limited(0))),
-      capacity: Arc::new(Mutex::new(QueueSize::Limited(num_elements))),
-    }
+  pub fn with_num_elements(mut self, num_elements: usize) -> Self {
+    self.capacity = Arc::new(Mutex::new(QueueSize::Limited(num_elements)));
+    self
+  }
+
+  pub fn with_elements(mut self, values: impl IntoIterator<Item = E> + ExactSizeIterator) -> Self {
+    let num_elements = values.len();
+    self.capacity = Arc::new(Mutex::new(QueueSize::Limited(num_elements)));
+    self.offer_all(values).unwrap();
+    self
   }
 }
