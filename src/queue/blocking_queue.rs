@@ -182,7 +182,7 @@ mod tests {
 
   impl CountDownLatch {
     fn new(count: usize) -> Self {
-      CountDownLatch {
+      Self {
         count: Mutex::new(count),
         condvar: Condvar::new(),
       }
