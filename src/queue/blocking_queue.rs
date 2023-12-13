@@ -81,12 +81,12 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
     let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     while queue_vec_mutex_guard.is_full() {
       if self.check_and_update_interrupted() {
-        // log::debug!("put: return by interrupted");
+        log::debug!("put: return by interrupted");
         return Err(QueueError::<E>::InterruptedError.into());
       }
-      // log::debug!("put: blocking start...");
+      log::debug!("put: blocking start...");
       queue_vec_mutex_guard = not_full.wait(queue_vec_mutex_guard).unwrap();
-      // log::debug!("put: blocking end...");
+      log::debug!("put: blocking end...");
     }
     let result = queue_vec_mutex_guard.offer(elements);
     not_empty.notify_one();
@@ -98,12 +98,12 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
     let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
     while queue_vec_mutex_guard.is_empty() {
       if self.check_and_update_interrupted() {
-        // log::debug!("take: return by interrupted");
+        log::debug!("take: return by interrupted");
         return Err(QueueError::<E>::InterruptedError.into());
       }
-      // log::debug!("take: blocking start...");
+      log::debug!("take: blocking start...");
       queue_vec_mutex_guard = not_empty.wait(queue_vec_mutex_guard).unwrap();
-      // log::debug!("take: blocking end...");
+      log::debug!("take: blocking end...");
     }
     let result = queue_vec_mutex_guard.poll();
     not_full.notify_one();
@@ -123,11 +123,12 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
   }
 
   fn interrupt(&mut self) {
-    // log::debug!("interrupting...");
+    log::debug!("interrupt: start...");
     self.is_interrupted.store(true, Ordering::Relaxed);
     let (_, not_full, not_empty) = &*self.underlying;
     not_empty.notify_one();
     not_full.notify_one();
+    log::debug!("interrupt: end...");
   }
 
   fn is_interrupted(&self) -> bool {
@@ -319,9 +320,7 @@ mod tests {
 
     let handler1 = thread::spawn(move || {
       for i in 0..QUEUE_SIZE.to_usize() {
-        // log::debug!("take: start: {}", i);
         let _ = q2.put(i as i32).unwrap();
-        // log::debug!("take: finish: {},{:?}", i, n);
       }
       assert_eq!(q2.len(), QUEUE_SIZE);
 
@@ -353,6 +352,7 @@ mod tests {
     });
 
     please_interrupt.wait();
+    assert!(!handler1.is_finished());
     q1.interrupt();
     handler1.join().unwrap();
   }
@@ -373,9 +373,7 @@ mod tests {
 
     let handler1 = thread::spawn(move || {
       for i in 0..capacity {
-        // log::debug!("take: start: {}", i);
         let _ = q2.put(i as i32);
-        // log::debug!("take: finish: {},{:?}", i, n);
       }
       please_take_cloned.count_down();
       q2.put(86).unwrap();
@@ -416,9 +414,7 @@ mod tests {
 
     let handler1 = thread::spawn(move || {
       for _ in 0..QUEUE_SIZE.to_usize() {
-        // log::debug!("take: start: {}", i);
         let _ = q2.take().unwrap();
-        // log::debug!("take: finish: {},{:?}", i, n);
       }
 
       q2.interrupt();
@@ -449,6 +445,7 @@ mod tests {
     });
 
     please_interrupt.wait();
+    assert!(!handler1.is_finished());
     q1.interrupt();
     handler1.join().unwrap();
   }
