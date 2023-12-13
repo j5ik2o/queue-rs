@@ -450,7 +450,7 @@ mod tests {
 
   #[test]
   #[serial]
-  fn test_timed_offer() {
+  fn test_timed_put() {
     init_logger();
     let mut q = create_blocking_queue(QueueType::Vec, QueueSize::Limited(2));
     let mut q_cloned = q.clone();
