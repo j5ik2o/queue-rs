@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 use thiserror::Error;
@@ -61,6 +62,8 @@ pub enum QueueError<E> {
   ContainsError,
   #[error("Failed to interrupt")]
   InterruptedError,
+  #[error("Failed to timeout")]
+  TimeoutError,
 }
 
 /// The size of the queue.<br/>
@@ -289,7 +292,21 @@ pub trait BlockingQueueBehavior<E: Element>: QueueBehavior<E> + Send {
   /// # Return Value / 戻り値
   /// - `Ok(())` - If the element is inserted successfully. / 要素が正常に挿入された場合。
   /// - `Err(QueueError::OfferError(element))` - If the element cannot be inserted. / 要素を挿入できなかった場合。
-  fn put(&mut self, elements: E) -> Result<()>;
+  /// - `Err(QueueError::InterruptedError)` - If the operation is interrupted. / 操作が中断された場合。
+  fn put(&mut self, element: E) -> Result<()>;
+
+  /// Inserts the specified element into this queue. If necessary, waits until space is available. You can specify the waiting time.<br/>
+  /// 指定された要素をこのキューに挿入します。必要に応じて、空きが生じるまで待機します。待機時間を指定できます。
+  ///
+  /// # Arguments / 引数
+  /// - `element` - The element to be inserted. / 挿入する要素。
+  ///
+  /// # Return Value / 戻り値
+  /// - `Ok(())` - If the element is inserted successfully. / 要素が正常に挿入された場合。
+  /// - `Err(QueueError::OfferError(element))` - If the element cannot be inserted. / 要素を挿入できなかった場合。
+  /// - `Err(QueueError::InterruptedError)` - If the operation is interrupted. / 操作が中断された場合。
+  /// - `Err(QueueError::TimeoutError)` - If the operation times out. / 操作がタイムアウトした場合。
+  fn put_timeout(&mut self, element: E, timeout: Duration) -> Result<()>;
 
   /// Retrieve the head of this queue and delete it. If necessary, wait until an element becomes available.<br/>
   /// このキューの先頭を取得して削除します。必要に応じて、要素が利用可能になるまで待機します。
@@ -299,6 +316,19 @@ pub trait BlockingQueueBehavior<E: Element>: QueueBehavior<E> + Send {
   /// - `Ok(None)` - If the queue is empty. / キューが空の場合。
   /// - `Err(QueueError::InterruptedError)` - If the operation is interrupted. / 操作が中断された場合。
   fn take(&mut self) -> Result<Option<E>>;
+
+  /// Retrieve the head of this queue and delete it. If necessary, wait until an element becomes available. You can specify the waiting time.<br/>
+  /// このキューの先頭を取得して削除します。必要に応じて、要素が利用可能になるまで待機します。待機時間を指定できます。
+  ///
+  /// # Arguments / 引数
+  /// - `timeout` - The maximum time to wait. / 待機する最大時間。
+  ///
+  /// # Return Value / 戻り値
+  /// - `Ok(Some(element))` - If the element is retrieved successfully. / 要素が正常に取得された場合。
+  /// - `Ok(None)` - If the queue is empty. / キューが空の場合。
+  /// - `Err(QueueError::InterruptedError)` - If the operation is interrupted. / 操作が中断された場合。
+  /// - `Err(QueueError::TimeoutError)` - If the operation times out. / 操作がタイムアウトした場合。
+  fn take_timeout(&mut self, timeout: Duration) -> Result<Option<E>>;
 
   /// Returns the number of elements that can be inserted into this queue without blocking.<br/>
   /// ブロックせずにこのキューに挿入できる要素数を返します。
