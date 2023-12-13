@@ -1,4 +1,4 @@
-use crate::queue::{Element, HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueError, QueueSize, QueueVec};
+use crate::queue::{Element, HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueError, QueueSize};
 use std::collections::LinkedList;
 use std::sync::{Arc, Mutex};
 

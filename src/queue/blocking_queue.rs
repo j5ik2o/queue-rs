@@ -330,8 +330,10 @@ mod tests {
         Ok(_) => {
           panic!("put: finish: 99, should not be here");
         }
-        Err(_) => {
-          // log::debug!("put: finish: 99, error = {:?}", e);
+        Err(err) => {
+          log::debug!("put: finish: 99, error = {:?}", err);
+          let queue_error = err.downcast_ref::<QueueError<i32>>().unwrap();
+          assert_eq!(queue_error, &QueueError::InterruptedError);
         }
       }
       assert!(!q2.is_interrupted());
@@ -341,8 +343,10 @@ mod tests {
         Ok(_) => {
           panic!("put: finish: 99, should not be here");
         }
-        Err(_) => {
-          // log::debug!("put: finish: 99, error = {:?}", e);
+        Err(err) => {
+          log::debug!("put: finish: 99, error = {:?}", err);
+          let queue_error = err.downcast_ref::<QueueError<i32>>().unwrap();
+          assert_eq!(queue_error, &QueueError::InterruptedError);
         }
       }
       assert!(!q2.is_interrupted());
@@ -381,8 +385,10 @@ mod tests {
         Ok(_) => {
           panic!("put: finish: 99, should not be here");
         }
-        Err(_) => {
-          // log::debug!("put: finish: 99, error = {:?}", e);
+        Err(err) => {
+          log::debug!("put: finish: 99, error = {:?}", err);
+          let queue_error = err.downcast_ref::<QueueError<i32>>().unwrap();
+          assert_eq!(queue_error, &QueueError::InterruptedError);
         }
       }
     });
@@ -420,8 +426,10 @@ mod tests {
         Ok(_) => {
           panic!("take: finish: should not be here");
         }
-        Err(_) => {
-          // log::debug!("take: finish: error = {:?}", e);
+        Err(err) => {
+          log::debug!("take: finish: error = {:?}", err);
+          let queue_error = err.downcast_ref::<QueueError<i32>>().unwrap();
+          assert_eq!(queue_error, &QueueError::InterruptedError);
         }
       }
       assert!(!q2.is_interrupted());
@@ -431,8 +439,10 @@ mod tests {
         Ok(_) => {
           panic!("take: finish: should not be here");
         }
-        Err(_) => {
-          // log::debug!("take: finish: error = {:?}", e);
+        Err(err) => {
+          log::debug!("take: finish: error = {:?}", err);
+          let queue_error = err.downcast_ref::<QueueError<i32>>().unwrap();
+          assert_eq!(queue_error, &QueueError::InterruptedError);
         }
       }
       assert!(!q2.is_interrupted());

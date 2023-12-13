@@ -49,7 +49,7 @@ impl<T: Debug + Clone + Send + Sync> Element for Arc<T> {}
 
 /// An error that occurs when a queue operation fails.<br/>
 /// キューの操作に失敗した場合に発生するエラー。
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum QueueError<E> {
   #[error("Failed to offer an element: {0:?}")]
   OfferError(E),
