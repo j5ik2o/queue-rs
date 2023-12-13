@@ -463,9 +463,18 @@ mod tests {
       let start_time = std::time::Instant::now();
       assert!(q_cloned.put_timeout(3, TIME_OUT).is_err());
       assert!(start_time.elapsed() >= TIME_OUT);
+
       please_interrupt_cloned.count_down();
-      let r = q_cloned.put_timeout(4, Duration::from_millis(500));
-      assert!(r.is_err());
+      match q_cloned.put_timeout(4, Duration::from_secs(3)) {
+        Ok(_) => {
+          panic!("put: finish: 4, should not be here");
+        }
+        Err(err) => {
+          log::debug!("put: finish: 4, error = {:?}", err);
+          let queue_error = err.downcast_ref::<QueueError<i32>>().unwrap();
+          assert_eq!(queue_error, &QueueError::InterruptedError);
+        }
+      }
     });
 
     please_interrupt.wait();
@@ -541,7 +550,16 @@ mod tests {
     for i in 0..QUEUE_SIZE.to_usize() {
       assert_eq!(q.take_timeout(Duration::ZERO).unwrap(), Some(i as i32));
     }
-    assert!(q.take_timeout(Duration::ZERO).is_err());
+    match q.take_timeout(Duration::ZERO) {
+      Ok(_) => {
+        panic!("take: finish: should not be here");
+      }
+      Err(err) => {
+        log::debug!("take: finish: error = {:?}", err);
+        let queue_error = err.downcast_ref::<QueueError<i32>>().unwrap();
+        assert_eq!(queue_error, &QueueError::TimeoutError);
+      }
+    }
   }
 
   #[test]
@@ -555,7 +573,16 @@ mod tests {
       assert!(start_time.elapsed() <= TIME_OUT);
     }
     let start_time = std::time::Instant::now();
-    assert!(q.take_timeout(TIME_OUT).is_err());
+    match q.take_timeout(TIME_OUT) {
+      Ok(_) => {
+        panic!("take: finish: should not be here");
+      }
+      Err(err) => {
+        log::debug!("take: finish: error = {:?}", err);
+        let queue_error = err.downcast_ref::<QueueError<i32>>().unwrap();
+        assert_eq!(queue_error, &QueueError::TimeoutError);
+      }
+    }
     assert!(start_time.elapsed() >= TIME_OUT);
   }
 
