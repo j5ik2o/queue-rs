@@ -12,6 +12,7 @@ pub use queue_mpsc::*;
 pub use queue_vec::*;
 
 mod blocking_queue;
+mod blocking_queue_test;
 mod queue_linkedlist;
 mod queue_mpsc;
 mod queue_vec;
