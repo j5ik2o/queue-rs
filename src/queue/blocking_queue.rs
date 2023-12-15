@@ -248,6 +248,12 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> Iterator for BlockingQueueIntoIt
   }
 }
 
+impl<E: Element + 'static, Q: QueueBehavior<E>> ExactSizeIterator for BlockingQueueIntoIter<E, Q> {
+  fn len(&self) -> usize {
+    self.q.len().to_usize()
+  }
+}
+
 pub struct BlockingQueueIter<'a, E: Element + 'static, Q: QueueBehavior<E>> {
   q: &'a mut BlockingQueue<E, Q>,
   p: PhantomData<E>,
@@ -258,5 +264,11 @@ impl<'a, E: Element + 'static, Q: QueueBehavior<E>> Iterator for BlockingQueueIt
 
   fn next(&mut self) -> Option<Self::Item> {
     self.q.take().ok().flatten()
+  }
+}
+
+impl<'a, E: Element + 'static, Q: QueueBehavior<E>> ExactSizeIterator for BlockingQueueIter<'a, E, Q> {
+  fn len(&self) -> usize {
+    self.q.len().to_usize()
   }
 }

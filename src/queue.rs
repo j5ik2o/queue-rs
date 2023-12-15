@@ -497,7 +497,12 @@ impl<E, Q: QueueBehavior<E>> Iterator for QueueIntoIter<E, Q> {
   type Item = E;
 
   fn next(&mut self) -> Option<Self::Item> {
-    self.q.poll().unwrap()
+    self.q.poll().ok().flatten()
+  }
+}
+impl<E: Element + 'static, Q: QueueBehavior<E>> ExactSizeIterator for QueueIntoIter<E, Q> {
+  fn len(&self) -> usize {
+    self.q.len().to_usize()
   }
 }
 
@@ -511,6 +516,12 @@ impl<'a, E, Q: QueueBehavior<E>> Iterator for QueueIter<'a, E, Q> {
 
   fn next(&mut self) -> Option<Self::Item> {
     self.q.poll().unwrap()
+  }
+}
+
+impl<'a, E: Element + 'static, Q: QueueBehavior<E>> ExactSizeIterator for QueueIter<'a, E, Q> {
+  fn len(&self) -> usize {
+    self.q.len().to_usize()
   }
 }
 

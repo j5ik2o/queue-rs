@@ -80,8 +80,18 @@ mod tests {
     init_logger();
 
     let elements: Vec<i32> = Vec::with_capacity(QUEUE_SIZE.to_usize());
-    let q = create_blocking_queue_with_elements(QueueType::Vec, elements.clone());
+    let q = create_blocking_queue_with_elements(QueueType::Vec, elements.clone().into_iter());
     assert_eq!(q.remaining_capacity(), QueueSize::Limited(elements.len()));
+  }
+
+  #[test]
+  #[serial]
+  fn test_constructor4() {
+    init_logger();
+
+    let elements = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let q = create_blocking_queue_with_elements(QueueType::Vec, elements.clone().into_iter());
+    assert_eq!(q.remaining_capacity(), QueueSize::Limited(elements.len().to_usize()));
   }
 
   #[test]
@@ -133,7 +143,7 @@ mod tests {
   fn test_into_blocking_iter() {
     init_logger();
 
-    let mut q = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let q = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
     let mut q_cloned = q.clone();
     let mut counter = q.len().to_usize();
     for e in q.into_blocking_iter() {
@@ -486,8 +496,11 @@ mod tests {
     q
   }
 
-  fn create_blocking_queue_with_elements(queue_type: QueueType, elements: Vec<i32>) -> BlockingQueue<i32, Queue<i32>> {
-    let q = create_queue_with_elements::<i32>(queue_type, elements.into_iter()).with_blocking();
+  fn create_blocking_queue_with_elements(
+    queue_type: QueueType,
+    elements: impl IntoIterator<Item = i32> + ExactSizeIterator,
+  ) -> BlockingQueue<i32, Queue<i32>> {
+    let q = create_queue_with_elements::<i32>(queue_type, elements).with_blocking();
     q
   }
 }
