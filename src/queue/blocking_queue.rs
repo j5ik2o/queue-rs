@@ -7,7 +7,8 @@ use std::time::Duration;
 use anyhow::Result;
 
 use crate::queue::{
-  BlockingQueueBehavior, Element, HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueError, QueueSize,
+  BlockingQueueBehavior, Element, HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueError, QueueIntoIter,
+  QueueIter, QueueSize,
 };
 
 #[derive(Debug, Clone)]
@@ -181,7 +182,7 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
   }
 }
 
-impl<E, Q: QueueBehavior<E>> BlockingQueue<E, Q> {
+impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueue<E, Q> {
   pub fn new(queue: Q) -> Self {
     Self {
       underlying: Arc::new((Mutex::new(queue), Condvar::new(), Condvar::new())),
@@ -198,5 +199,64 @@ impl<E, Q: QueueBehavior<E>> BlockingQueue<E, Q> {
       Ok(_) => true,
       Err(_) => false,
     }
+  }
+
+  pub fn iter(&mut self) -> QueueIter<E, BlockingQueue<E, Q>> {
+    QueueIter {
+      q: self,
+      p: PhantomData,
+    }
+  }
+
+  pub fn blocking_iter(&mut self) -> BlockingQueueIter<E, Q> {
+    BlockingQueueIter {
+      q: self,
+      p: PhantomData,
+    }
+  }
+
+  pub fn into_blocking_iter(self) -> BlockingQueueIntoIter<E, Q> {
+    BlockingQueueIntoIter {
+      q: self,
+      p: PhantomData,
+    }
+  }
+}
+
+impl<E: Element + 'static, Q: QueueBehavior<E>> IntoIterator for BlockingQueue<E, Q> {
+  type IntoIter = QueueIntoIter<E, BlockingQueue<E, Q>>;
+  type Item = E;
+
+  fn into_iter(self) -> Self::IntoIter {
+    QueueIntoIter {
+      q: self,
+      p: PhantomData,
+    }
+  }
+}
+
+pub struct BlockingQueueIntoIter<E: Element + 'static, Q: QueueBehavior<E>> {
+  q: BlockingQueue<E, Q>,
+  p: PhantomData<E>,
+}
+
+impl<E: Element + 'static, Q: QueueBehavior<E>> Iterator for BlockingQueueIntoIter<E, Q> {
+  type Item = E;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    self.q.take().ok().flatten()
+  }
+}
+
+pub struct BlockingQueueIter<'a, E: Element + 'static, Q: QueueBehavior<E>> {
+  q: &'a mut BlockingQueue<E, Q>,
+  p: PhantomData<E>,
+}
+
+impl<'a, E: Element + 'static, Q: QueueBehavior<E>> Iterator for BlockingQueueIter<'a, E, Q> {
+  type Item = E;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    self.q.take().ok().flatten()
   }
 }

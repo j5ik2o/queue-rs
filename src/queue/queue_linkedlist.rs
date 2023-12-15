@@ -1,6 +1,10 @@
-use crate::queue::{Element, HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueError, QueueSize};
 use std::collections::LinkedList;
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
+
+use crate::queue::{
+  Element, HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueError, QueueIntoIter, QueueIter, QueueSize,
+};
 
 /// A queue implementation backed by a `LinkedList`.<br/>
 /// `LinkedList` で実装されたキュー。
@@ -57,6 +61,13 @@ impl<E: Element + 'static> QueueLinkedList<E> {
     self.capacity = QueueSize::Limited(num_elements);
     self
   }
+
+  pub fn iter(&mut self) -> QueueIter<E, QueueLinkedList<E>> {
+    QueueIter {
+      q: self,
+      p: PhantomData,
+    }
+  }
 }
 
 impl<E: Element + 'static> HasPeekBehavior<E> for QueueLinkedList<E> {
@@ -70,5 +81,17 @@ impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for QueueLinkedLis
   fn contains(&self, element: &E) -> bool {
     let mg = self.values.lock().unwrap();
     mg.contains(element)
+  }
+}
+
+impl<E: Element + 'static> IntoIterator for QueueLinkedList<E> {
+  type IntoIter = QueueIntoIter<E, QueueLinkedList<E>>;
+  type Item = E;
+
+  fn into_iter(self) -> Self::IntoIter {
+    QueueIntoIter {
+      q: self,
+      p: PhantomData,
+    }
   }
 }

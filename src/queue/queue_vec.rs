@@ -1,10 +1,13 @@
 use std::collections::VecDeque;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 
-use crate::queue::{Element, HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueError, QueueSize};
+use crate::queue::{
+  Element, HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueError, QueueIntoIter, QueueIter, QueueSize,
+};
 
 /// A queue implementation backed by a `VecDeque`.<br/>
 /// `VecDeque` で実装されたキュー。
@@ -33,6 +36,13 @@ impl<E: Element> QueueVec<E> {
     self.values = Arc::new(Mutex::new(vec));
     self.capacity = QueueSize::Limited(num_elements);
     self
+  }
+
+  pub fn iter(&mut self) -> QueueIter<E, QueueVec<E>> {
+    QueueIter {
+      q: self,
+      p: PhantomData,
+    }
   }
 }
 
@@ -74,5 +84,17 @@ impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for QueueVec<E> {
   fn contains(&self, element: &E) -> bool {
     let mg = self.values.lock().unwrap();
     mg.contains(element)
+  }
+}
+
+impl<E: Element + 'static> IntoIterator for QueueVec<E> {
+  type IntoIter = QueueIntoIter<E, QueueVec<E>>;
+  type Item = E;
+
+  fn into_iter(self) -> Self::IntoIter {
+    QueueIntoIter {
+      q: self,
+      p: PhantomData,
+    }
   }
 }

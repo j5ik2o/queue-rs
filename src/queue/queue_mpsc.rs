@@ -1,9 +1,11 @@
-use crate::queue::{Element, QueueBehavior, QueueError, QueueSize};
 use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::sync::mpsc::{channel, Receiver, SendError, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
+
+use crate::queue::{Element, QueueBehavior, QueueError, QueueIntoIter, QueueIter, QueueSize};
 
 /// A queue implementation backed by a `MPSC`.<br/>
 /// `QueueMPSC` で実装されたキュー。
@@ -72,5 +74,24 @@ impl<E: Element + 'static> QueueMPSC<E> {
     self.capacity = Arc::new(Mutex::new(QueueSize::Limited(num_elements)));
     self.offer_all(values).unwrap();
     self
+  }
+
+  pub fn iter(&mut self) -> QueueIter<E, QueueMPSC<E>> {
+    QueueIter {
+      q: self,
+      p: PhantomData,
+    }
+  }
+}
+
+impl<E: Element + 'static> IntoIterator for QueueMPSC<E> {
+  type IntoIter = QueueIntoIter<E, QueueMPSC<E>>;
+  type Item = E;
+
+  fn into_iter(self) -> Self::IntoIter {
+    QueueIntoIter {
+      q: self,
+      p: PhantomData,
+    }
   }
 }

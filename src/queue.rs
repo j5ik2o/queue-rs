@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -19,7 +20,11 @@ mod queue_vec;
 
 /// A trait that represents an element.<br/>
 /// 要素を表すトレイト。
-pub trait Element: Debug + Clone + Send + Sync {}
+pub trait Element: Debug + Clone + Send + Sync {
+  fn is_empty(&self) -> bool {
+    false
+  }
+}
 
 impl Element for i8 {}
 
@@ -43,11 +48,21 @@ impl Element for f32 {}
 
 impl Element for f64 {}
 
-impl Element for String {}
+impl Element for String {
+  fn is_empty(&self) -> bool {
+    String::is_empty(self)
+  }
+}
 
 impl<T: Debug + Clone + Send + Sync> Element for Box<T> {}
 
 impl<T: Debug + Clone + Send + Sync> Element for Arc<T> {}
+
+impl<T: Debug + Clone + Send + Sync> Element for Option<T> {
+  fn is_empty(&self) -> bool {
+    self.is_none()
+  }
+}
 
 /// An error that occurs when a queue operation fails.<br/>
 /// キューの操作に失敗した場合に発生するエラー。
@@ -390,6 +405,13 @@ impl<T: Element + 'static> Queue<T> {
   pub fn with_blocking(self) -> BlockingQueue<T, Queue<T>> {
     BlockingQueue::new(self)
   }
+
+  pub fn iter(&mut self) -> QueueIter<T, Queue<T>> {
+    QueueIter {
+      q: self,
+      p: PhantomData,
+    }
+  }
 }
 
 impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
@@ -454,6 +476,44 @@ impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for Queue<E> {
   }
 }
 
+impl<E: Element + 'static> IntoIterator for Queue<E> {
+  type IntoIter = QueueIntoIter<E, Queue<E>>;
+  type Item = E;
+
+  fn into_iter(self) -> Self::IntoIter {
+    QueueIntoIter {
+      q: self,
+      p: PhantomData,
+    }
+  }
+}
+
+pub struct QueueIntoIter<E, Q> {
+  q: Q,
+  p: PhantomData<E>,
+}
+
+impl<E, Q: QueueBehavior<E>> Iterator for QueueIntoIter<E, Q> {
+  type Item = E;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    self.q.poll().unwrap()
+  }
+}
+
+pub struct QueueIter<'a, E, Q> {
+  q: &'a mut Q,
+  p: PhantomData<E>,
+}
+
+impl<'a, E, Q: QueueBehavior<E>> Iterator for QueueIter<'a, E, Q> {
+  type Item = E;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    self.q.poll().unwrap()
+  }
+}
+
 pub fn create_queue<T: Element + 'static>(queue_type: QueueType, num_elements: QueueSize) -> Queue<T> {
   match (queue_type, num_elements) {
     (QueueType::Vec, QueueSize::Limitless) => Queue::Vec(QueueVec::<T>::new()),
@@ -464,5 +524,16 @@ pub fn create_queue<T: Element + 'static>(queue_type: QueueType, num_elements: Q
     }
     (QueueType::MPSC, QueueSize::Limitless) => Queue::MPSC(QueueMPSC::<T>::new()),
     (QueueType::MPSC, QueueSize::Limited(num)) => Queue::MPSC(QueueMPSC::<T>::new().with_num_elements(num)),
+  }
+}
+
+pub fn create_queue_with_elements<T: Element + 'static>(
+  queue_type: QueueType,
+  values: impl IntoIterator<Item = T> + ExactSizeIterator,
+) -> Queue<T> {
+  match queue_type {
+    QueueType::Vec => Queue::Vec(QueueVec::<T>::new().with_elements(values)),
+    QueueType::LinkedList => Queue::LinkedList(QueueLinkedList::<T>::new().with_elements(values)),
+    QueueType::MPSC => Queue::MPSC(QueueMPSC::<T>::new().with_elements(values)),
   }
 }
