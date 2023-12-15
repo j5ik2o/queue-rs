@@ -387,7 +387,7 @@ pub enum QueueType {
 pub enum Queue<T> {
   /// A queue implemented with a vector.<br/>
   /// ベクタで実装されたキュー。
-  Vec(QueueVec<T>),
+  VecDequeue(QueueVec<T>),
   /// A queue implemented with LinkedList.<br/>
   /// LinkedListで実装されたキュー。
   LinkedList(QueueLinkedList<T>),
@@ -417,7 +417,7 @@ impl<T: Element + 'static> Queue<T> {
 impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
   fn len(&self) -> QueueSize {
     match self {
-      Queue::Vec(inner) => inner.len(),
+      Queue::VecDequeue(inner) => inner.len(),
       Queue::LinkedList(inner) => inner.len(),
       Queue::MPSC(inner) => inner.len(),
     }
@@ -425,7 +425,7 @@ impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
 
   fn capacity(&self) -> QueueSize {
     match self {
-      Queue::Vec(inner) => inner.capacity(),
+      Queue::VecDequeue(inner) => inner.capacity(),
       Queue::LinkedList(inner) => inner.capacity(),
       Queue::MPSC(inner) => inner.capacity(),
     }
@@ -433,7 +433,7 @@ impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
 
   fn offer(&mut self, element: T) -> Result<()> {
     match self {
-      Queue::Vec(inner) => inner.offer(element),
+      Queue::VecDequeue(inner) => inner.offer(element),
       Queue::LinkedList(inner) => inner.offer(element),
       Queue::MPSC(inner) => inner.offer(element),
     }
@@ -441,7 +441,7 @@ impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
 
   fn offer_all(&mut self, elements: impl IntoIterator<Item = T>) -> Result<()> {
     match self {
-      Queue::Vec(inner) => inner.offer_all(elements),
+      Queue::VecDequeue(inner) => inner.offer_all(elements),
       Queue::LinkedList(inner) => inner.offer_all(elements),
       Queue::MPSC(inner) => inner.offer_all(elements),
     }
@@ -449,7 +449,7 @@ impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
 
   fn poll(&mut self) -> Result<Option<T>> {
     match self {
-      Queue::Vec(inner) => inner.poll(),
+      Queue::VecDequeue(inner) => inner.poll(),
       Queue::LinkedList(inner) => inner.poll(),
       Queue::MPSC(inner) => inner.poll(),
     }
@@ -459,7 +459,7 @@ impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
 impl<E: Element + 'static> HasPeekBehavior<E> for Queue<E> {
   fn peek(&self) -> Result<Option<E>> {
     match self {
-      Queue::Vec(inner) => inner.peek(),
+      Queue::VecDequeue(inner) => inner.peek(),
       Queue::LinkedList(inner) => inner.peek(),
       Queue::MPSC(_) => panic!("Not supported implementation."),
     }
@@ -469,7 +469,7 @@ impl<E: Element + 'static> HasPeekBehavior<E> for Queue<E> {
 impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for Queue<E> {
   fn contains(&self, element: &E) -> bool {
     match self {
-      Queue::Vec(inner) => inner.contains(element),
+      Queue::VecDequeue(inner) => inner.contains(element),
       Queue::LinkedList(inner) => inner.contains(element),
       Queue::MPSC(_) => panic!("Not supported implementation."),
     }
@@ -527,8 +527,8 @@ impl<'a, E: Element + 'static, Q: QueueBehavior<E>> ExactSizeIterator for QueueI
 
 pub fn create_queue<T: Element + 'static>(queue_type: QueueType, num_elements: QueueSize) -> Queue<T> {
   match (queue_type, num_elements) {
-    (QueueType::VecDequeue, QueueSize::Limitless) => Queue::Vec(QueueVec::<T>::new()),
-    (QueueType::VecDequeue, QueueSize::Limited(num)) => Queue::Vec(QueueVec::<T>::new().with_num_elements(num)),
+    (QueueType::VecDequeue, QueueSize::Limitless) => Queue::VecDequeue(QueueVec::<T>::new()),
+    (QueueType::VecDequeue, QueueSize::Limited(num)) => Queue::VecDequeue(QueueVec::<T>::new().with_num_elements(num)),
     (QueueType::LinkedList, QueueSize::Limitless) => Queue::LinkedList(QueueLinkedList::<T>::new()),
     (QueueType::LinkedList, QueueSize::Limited(num)) => {
       Queue::LinkedList(QueueLinkedList::<T>::new().with_num_elements(num))
@@ -543,7 +543,7 @@ pub fn create_queue_with_elements<T: Element + 'static>(
   values: impl IntoIterator<Item = T> + ExactSizeIterator,
 ) -> Queue<T> {
   match queue_type {
-    QueueType::VecDequeue => Queue::Vec(QueueVec::<T>::new().with_elements(values)),
+    QueueType::VecDequeue => Queue::VecDequeue(QueueVec::<T>::new().with_elements(values)),
     QueueType::LinkedList => Queue::LinkedList(QueueLinkedList::<T>::new().with_elements(values)),
     QueueType::MPSC => Queue::MPSC(QueueMPSC::<T>::new().with_elements(values)),
   }
