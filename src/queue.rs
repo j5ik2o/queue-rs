@@ -370,9 +370,9 @@ pub trait BlockingQueueBehavior<E: Element>: QueueBehavior<E> + Send {
 /// An enumeration type that represents the type of queue.<br/>
 /// キューの種類を表す列挙型。
 pub enum QueueType {
-  /// A queue implemented with a vector.<br/>
-  /// ベクタで実装されたキュー。
-  Vec,
+  /// A queue implemented with VecDequeue.<br/>
+  /// VecDequeueで実装されたキュー。
+  VecDequeue,
   /// A queue implemented with LinkedList.<br/>
   /// LinkedListで実装されたキュー。
   LinkedList,
@@ -527,8 +527,8 @@ impl<'a, E: Element + 'static, Q: QueueBehavior<E>> ExactSizeIterator for QueueI
 
 pub fn create_queue<T: Element + 'static>(queue_type: QueueType, num_elements: QueueSize) -> Queue<T> {
   match (queue_type, num_elements) {
-    (QueueType::Vec, QueueSize::Limitless) => Queue::Vec(QueueVec::<T>::new()),
-    (QueueType::Vec, QueueSize::Limited(num)) => Queue::Vec(QueueVec::<T>::new().with_num_elements(num)),
+    (QueueType::VecDequeue, QueueSize::Limitless) => Queue::Vec(QueueVec::<T>::new()),
+    (QueueType::VecDequeue, QueueSize::Limited(num)) => Queue::Vec(QueueVec::<T>::new().with_num_elements(num)),
     (QueueType::LinkedList, QueueSize::Limitless) => Queue::LinkedList(QueueLinkedList::<T>::new()),
     (QueueType::LinkedList, QueueSize::Limited(num)) => {
       Queue::LinkedList(QueueLinkedList::<T>::new().with_num_elements(num))
@@ -543,7 +543,7 @@ pub fn create_queue_with_elements<T: Element + 'static>(
   values: impl IntoIterator<Item = T> + ExactSizeIterator,
 ) -> Queue<T> {
   match queue_type {
-    QueueType::Vec => Queue::Vec(QueueVec::<T>::new().with_elements(values)),
+    QueueType::VecDequeue => Queue::Vec(QueueVec::<T>::new().with_elements(values)),
     QueueType::LinkedList => Queue::LinkedList(QueueLinkedList::<T>::new().with_elements(values)),
     QueueType::MPSC => Queue::MPSC(QueueMPSC::<T>::new().with_elements(values)),
   }

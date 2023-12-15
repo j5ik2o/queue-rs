@@ -59,7 +59,7 @@ mod tests {
   fn test_constructor1() {
     init_logger();
 
-    let mut q = create_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let mut q = create_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
     assert_eq!(q.remaining_capacity(), QUEUE_SIZE);
     assert_eq!(q.poll().unwrap(), None);
   }
@@ -69,7 +69,7 @@ mod tests {
   fn test_constructor2() {
     init_logger();
 
-    let mut q = create_blocking_queue(QueueType::Vec, QueueSize::Limitless);
+    let mut q = create_blocking_queue(QueueType::VecDequeue, QueueSize::Limitless);
     assert_eq!(QueueSize::Limitless, q.remaining_capacity());
     assert_eq!(q.poll().unwrap(), None);
   }
@@ -80,7 +80,7 @@ mod tests {
     init_logger();
 
     let elements: Vec<i32> = Vec::with_capacity(QUEUE_SIZE.to_usize());
-    let q = create_blocking_queue_with_elements(QueueType::Vec, elements.clone().into_iter());
+    let q = create_blocking_queue_with_elements(QueueType::VecDequeue, elements.clone().into_iter());
     assert_eq!(q.remaining_capacity(), QueueSize::Limited(elements.len()));
   }
 
@@ -89,8 +89,8 @@ mod tests {
   fn test_constructor4() {
     init_logger();
 
-    let elements = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
-    let q = create_blocking_queue_with_elements(QueueType::Vec, elements.clone().into_iter());
+    let elements = populated_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
+    let q = create_blocking_queue_with_elements(QueueType::VecDequeue, elements.clone().into_iter());
     assert_eq!(q.remaining_capacity(), QueueSize::Limited(elements.len().to_usize()));
   }
 
@@ -99,7 +99,7 @@ mod tests {
   fn test_iter() {
     init_logger();
 
-    let mut q = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let mut q = populated_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
     for e in q.iter() {
       log::debug!("e = {:?}", e);
     }
@@ -112,7 +112,7 @@ mod tests {
   fn test_into_iter() {
     init_logger();
 
-    let mut q = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let mut q = populated_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
     for e in q.clone().into_iter() {
       log::debug!("e = {:?}", e);
     }
@@ -125,7 +125,7 @@ mod tests {
   fn test_blocking_iter() {
     init_logger();
 
-    let mut q = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let mut q = populated_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
     let mut q_cloned = q.clone();
     let mut counter = q.len().to_usize();
     for e in q.blocking_iter() {
@@ -143,7 +143,7 @@ mod tests {
   fn test_into_blocking_iter() {
     init_logger();
 
-    let q = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let q = populated_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
     let mut q_cloned = q.clone();
     let mut counter = q.len().to_usize();
     for e in q.into_blocking_iter() {
@@ -161,7 +161,7 @@ mod tests {
   fn test_empty_full() {
     init_logger();
 
-    let mut q = create_blocking_queue(QueueType::Vec, QueueSize::Limited(2));
+    let mut q = create_blocking_queue(QueueType::VecDequeue, QueueSize::Limited(2));
     assert!(q.is_empty());
     assert_eq!(q.remaining_capacity().to_usize(), 2);
     assert!(q.offer(1).is_ok());
@@ -181,7 +181,7 @@ mod tests {
   fn test_remaining_capacity() {
     init_logger();
 
-    let mut q = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let mut q = populated_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
     for i in 0..QUEUE_SIZE.to_usize() {
       let remaining_capacity = q.remaining_capacity().to_usize();
       let len = q.len().to_usize();
@@ -207,7 +207,7 @@ mod tests {
   fn test_offer() {
     init_logger();
 
-    let mut q = create_blocking_queue(QueueType::Vec, QueueSize::Limited(1));
+    let mut q = create_blocking_queue(QueueType::VecDequeue, QueueSize::Limited(1));
     assert!(q.offer(0).is_ok());
     assert!(q.offer(1).is_err());
 
@@ -220,7 +220,7 @@ mod tests {
   fn test_offer_all() {
     init_logger();
 
-    let mut q = create_blocking_queue(QueueType::Vec, QueueSize::Limited(10));
+    let mut q = create_blocking_queue(QueueType::VecDequeue, QueueSize::Limited(10));
     let v = [1, 2, 3, 4, 5];
 
     assert!(q.offer_all(v).is_ok());
@@ -238,7 +238,7 @@ mod tests {
   fn test_put() {
     init_logger();
 
-    let mut q = create_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let mut q = create_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
     for i in 0..QUEUE_SIZE.to_usize() {
       q.put(i as i32).unwrap();
       assert!(q.contains(&(i as i32)));
@@ -250,7 +250,7 @@ mod tests {
   fn test_blocking_put() {
     init_logger();
 
-    let mut q = create_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let mut q = create_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
     let mut q_cloned = q.clone();
 
     let please_interrupt = Arc::new(CountDownLatch::new(1));
@@ -302,7 +302,7 @@ mod tests {
 
     let capacity = 2;
 
-    let mut q = create_blocking_queue(QueueType::Vec, QueueSize::Limited(capacity));
+    let mut q = create_blocking_queue(QueueType::VecDequeue, QueueSize::Limited(capacity));
     let mut q_cloned = q.clone();
 
     let please_take = Arc::new(CountDownLatch::new(1));
@@ -344,7 +344,7 @@ mod tests {
   fn test_timed_put() {
     init_logger();
 
-    let mut q = create_blocking_queue(QueueType::Vec, QueueSize::Limited(2));
+    let mut q = create_blocking_queue(QueueType::VecDequeue, QueueSize::Limited(2));
     let mut q_cloned = q.clone();
 
     let please_interrupt = Arc::new(CountDownLatch::new(1));
@@ -381,7 +381,7 @@ mod tests {
   pub fn test_blocking_take() {
     init_logger();
 
-    let mut q = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let mut q = populated_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
     let mut q_cloned = q.clone();
 
     let please_interrupt = Arc::new(CountDownLatch::new(1));
@@ -430,7 +430,7 @@ mod tests {
   fn test_poll() {
     init_logger();
 
-    let mut q = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let mut q = populated_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
     for i in 0..QUEUE_SIZE.to_usize() {
       assert_eq!(q.poll().unwrap(), Some(i as i32));
     }
@@ -442,7 +442,7 @@ mod tests {
   fn test_timed_take0() {
     init_logger();
 
-    let mut q = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let mut q = populated_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
     for i in 0..QUEUE_SIZE.to_usize() {
       assert_eq!(q.take_timeout(Duration::ZERO).unwrap(), Some(i as i32));
     }
@@ -463,7 +463,7 @@ mod tests {
   fn test_timed_take() {
     init_logger();
 
-    let mut q = populated_blocking_queue(QueueType::Vec, QUEUE_SIZE);
+    let mut q = populated_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
     for i in 0..QUEUE_SIZE.to_usize() {
       let start_time = std::time::Instant::now();
       assert_eq!(q.take_timeout(TIME_OUT).unwrap(), Some(i as i32));
