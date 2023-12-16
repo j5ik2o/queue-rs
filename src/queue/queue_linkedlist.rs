@@ -49,16 +49,14 @@ impl<E: Element + 'static> QueueLinkedList<E> {
     }
   }
 
-  pub fn with_num_elements(mut self, num_elements: usize) -> Self {
-    self.capacity = QueueSize::Limited(num_elements);
+  pub fn with_capacity(mut self, capacity: QueueSize) -> Self {
+    self.capacity = capacity;
     self
   }
 
   pub fn with_elements(mut self, values: impl IntoIterator<Item = E> + ExactSizeIterator) -> Self {
-    let num_elements = values.len();
     let vec = values.into_iter().collect::<LinkedList<E>>();
     self.values = Arc::new(Mutex::new(vec));
-    self.capacity = QueueSize::Limited(num_elements);
     self
   }
 

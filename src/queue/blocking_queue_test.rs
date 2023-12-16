@@ -80,7 +80,11 @@ mod tests {
     init_logger();
 
     let elements: Vec<i32> = Vec::with_capacity(QUEUE_SIZE.to_usize());
-    let q = create_blocking_queue_with_elements(QueueType::VecDequeue, elements.clone().into_iter());
+    let q = create_blocking_queue_with_elements(
+      QueueType::VecDequeue,
+      QueueSize::Limited(elements.len()),
+      elements.clone().into_iter(),
+    );
     assert_eq!(q.remaining_capacity(), QueueSize::Limited(elements.len()));
   }
 
@@ -90,7 +94,7 @@ mod tests {
     init_logger();
 
     let elements = populated_blocking_queue(QueueType::VecDequeue, QUEUE_SIZE);
-    let q = create_blocking_queue_with_elements(QueueType::VecDequeue, elements.clone().into_iter());
+    let q = create_blocking_queue_with_elements(QueueType::VecDequeue, elements.len(), elements.clone().into_iter());
     assert_eq!(q.remaining_capacity(), QueueSize::Limited(elements.len().to_usize()));
   }
 
@@ -498,9 +502,10 @@ mod tests {
 
   fn create_blocking_queue_with_elements(
     queue_type: QueueType,
+    size: QueueSize,
     elements: impl IntoIterator<Item = i32> + ExactSizeIterator,
   ) -> BlockingQueue<i32, Queue<i32>> {
-    let q = create_queue_with_elements::<i32>(queue_type, elements).with_blocking();
+    let q = create_queue_with_elements::<i32>(queue_type, size, elements).with_blocking();
     q
   }
 }

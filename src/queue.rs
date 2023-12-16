@@ -525,26 +525,31 @@ impl<'a, E: Element + 'static, Q: QueueBehavior<E>> ExactSizeIterator for QueueI
   }
 }
 
-pub fn create_queue<T: Element + 'static>(queue_type: QueueType, num_elements: QueueSize) -> Queue<T> {
-  match (queue_type, num_elements) {
+pub fn create_queue<T: Element + 'static>(queue_type: QueueType, queue_size: QueueSize) -> Queue<T> {
+  match (queue_type, &queue_size) {
     (QueueType::VecDequeue, QueueSize::Limitless) => Queue::VecDequeue(QueueVec::<T>::new()),
-    (QueueType::VecDequeue, QueueSize::Limited(num)) => Queue::VecDequeue(QueueVec::<T>::new().with_num_elements(num)),
+    (QueueType::VecDequeue, QueueSize::Limited(_)) => Queue::VecDequeue(QueueVec::<T>::new().with_capacity(queue_size)),
     (QueueType::LinkedList, QueueSize::Limitless) => Queue::LinkedList(QueueLinkedList::<T>::new()),
-    (QueueType::LinkedList, QueueSize::Limited(num)) => {
-      Queue::LinkedList(QueueLinkedList::<T>::new().with_num_elements(num))
+    (QueueType::LinkedList, QueueSize::Limited(_)) => {
+      Queue::LinkedList(QueueLinkedList::<T>::new().with_capacity(queue_size))
     }
     (QueueType::MPSC, QueueSize::Limitless) => Queue::MPSC(QueueMPSC::<T>::new()),
-    (QueueType::MPSC, QueueSize::Limited(num)) => Queue::MPSC(QueueMPSC::<T>::new().with_num_elements(num)),
+    (QueueType::MPSC, QueueSize::Limited(_)) => Queue::MPSC(QueueMPSC::<T>::new().with_capacity(queue_size)),
   }
 }
 
 pub fn create_queue_with_elements<T: Element + 'static>(
   queue_type: QueueType,
+  queue_size: QueueSize,
   values: impl IntoIterator<Item = T> + ExactSizeIterator,
 ) -> Queue<T> {
   match queue_type {
-    QueueType::VecDequeue => Queue::VecDequeue(QueueVec::<T>::new().with_elements(values)),
-    QueueType::LinkedList => Queue::LinkedList(QueueLinkedList::<T>::new().with_elements(values)),
-    QueueType::MPSC => Queue::MPSC(QueueMPSC::<T>::new().with_elements(values)),
+    QueueType::VecDequeue => Queue::VecDequeue(QueueVec::<T>::new().with_capacity(queue_size).with_elements(values)),
+    QueueType::LinkedList => Queue::LinkedList(
+      QueueLinkedList::<T>::new()
+        .with_capacity(queue_size)
+        .with_elements(values),
+    ),
+    QueueType::MPSC => Queue::MPSC(QueueMPSC::<T>::new().with_capacity(queue_size).with_elements(values)),
   }
 }

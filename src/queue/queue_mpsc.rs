@@ -11,28 +11,33 @@ use crate::queue::{Element, QueueBehavior, QueueError, QueueIntoIter, QueueIter,
 /// `QueueMPSC` で実装されたキュー。
 #[derive(Debug, Clone)]
 pub struct QueueMPSC<E> {
-  rx: Arc<Mutex<Receiver<E>>>,
+  inner: Arc<Mutex<QueueMPSCInner<E>>>,
   tx: Sender<E>,
-  count: Arc<Mutex<QueueSize>>,
-  capacity: Arc<Mutex<QueueSize>>,
+}
+
+#[derive(Debug)]
+struct QueueMPSCInner<E> {
+  rx: Receiver<E>,
+  count: QueueSize,
+  capacity: QueueSize,
 }
 
 impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
   fn len(&self) -> QueueSize {
-    let count_guard = self.count.lock().unwrap();
-    count_guard.clone()
+    let inner_guard = self.inner.lock().unwrap();
+    inner_guard.count.clone()
   }
 
   fn capacity(&self) -> QueueSize {
-    let capacity_guard = self.capacity.lock().unwrap();
-    capacity_guard.clone()
+    let inner_guard = self.inner.lock().unwrap();
+    inner_guard.capacity.clone()
   }
 
   fn offer(&mut self, element: E) -> Result<()> {
     match self.tx.send(element) {
       Ok(_) => {
-        let mut count_guard = self.count.lock().unwrap();
-        count_guard.increment();
+        let mut inner_guard = self.inner.lock().unwrap();
+        inner_guard.count.increment();
         Ok(())
       }
       Err(SendError(err)) => Err(QueueError::OfferError(err).into()),
@@ -40,11 +45,10 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
   }
 
   fn poll(&mut self) -> Result<Option<E>> {
-    let receiver_guard = self.rx.lock().unwrap();
-    match receiver_guard.try_recv() {
+    let mut inner_guard = self.inner.lock().unwrap();
+    match inner_guard.rx.try_recv() {
       Ok(element) => {
-        let mut count_guard = self.count.lock().unwrap();
-        count_guard.decrement();
+        inner_guard.count.decrement();
         Ok(Some(element))
       }
       Err(TryRecvError::Empty) => Ok(None),
@@ -57,21 +61,24 @@ impl<E: Element + 'static> QueueMPSC<E> {
   pub fn new() -> Self {
     let (tx, rx) = channel();
     Self {
-      rx: Arc::new(Mutex::new(rx)),
+      inner: Arc::new(Mutex::new(QueueMPSCInner {
+        rx,
+        count: QueueSize::Limited(0),
+        capacity: QueueSize::Limitless,
+      })),
       tx,
-      count: Arc::new(Mutex::new(QueueSize::Limited(0))),
-      capacity: Arc::new(Mutex::new(QueueSize::Limitless)),
     }
   }
 
-  pub fn with_num_elements(mut self, num_elements: usize) -> Self {
-    self.capacity = Arc::new(Mutex::new(QueueSize::Limited(num_elements)));
+  pub fn with_capacity(self, capacity: QueueSize) -> Self {
+    {
+      let mut inner_guard = self.inner.lock().unwrap();
+      inner_guard.capacity = capacity;
+    }
     self
   }
 
   pub fn with_elements(mut self, values: impl IntoIterator<Item = E> + ExactSizeIterator) -> Self {
-    let num_elements = values.len();
-    self.capacity = Arc::new(Mutex::new(QueueSize::Limited(num_elements)));
     self.offer_all(values).unwrap();
     self
   }
