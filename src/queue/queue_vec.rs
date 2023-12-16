@@ -10,29 +10,41 @@ use crate::queue::{
 };
 
 /// A queue implementation backed by a `VecDeque`.<br/>
-/// `VecDeque` で実装されたキュー。
+/// `VecDeque` によって実装されたキュー。
 #[derive(Debug, Clone)]
 pub struct QueueVec<E> {
-  values: Arc<Mutex<VecDeque<E>>>,
-  pub(crate) capacity: QueueSize,
+  elements: Arc<Mutex<VecDeque<E>>>,
+  capacity: QueueSize,
 }
 
 impl<E: Element> QueueVec<E> {
+  /// Create a new `QueueVec`.<br/>
+  /// 新しい `QueueVec` を作成します。
   pub fn new() -> Self {
     Self {
-      values: Arc::new(Mutex::new(VecDeque::new())),
+      elements: Arc::new(Mutex::new(VecDeque::new())),
       capacity: QueueSize::Limitless,
     }
   }
 
+  /// Update the maximum number of elements in the queue.<br/>
+  /// キューの最大要素数を更新します。
+  ///
+  /// # Arguments / 引数
+  /// - `capacity` - The maximum number of elements in the queue. / キューの最大要素数。
   pub fn with_capacity(mut self, capacity: QueueSize) -> Self {
     self.capacity = capacity;
     self
   }
 
-  pub fn with_elements(mut self, values: impl IntoIterator<Item = E> + ExactSizeIterator) -> Self {
-    let vec = values.into_iter().collect::<VecDeque<E>>();
-    self.values = Arc::new(Mutex::new(vec));
+  /// Update the elements in the queue.<br/>
+  /// キューの要素を更新します。
+  ///
+  /// # Arguments / 引数
+  /// - `elements` - The elements to be updated. / 更新する要素。
+  pub fn with_elements(mut self, elements: impl IntoIterator<Item = E> + ExactSizeIterator) -> Self {
+    let vec = elements.into_iter().collect::<VecDeque<E>>();
+    self.elements = Arc::new(Mutex::new(vec));
     self
   }
 
@@ -46,7 +58,7 @@ impl<E: Element> QueueVec<E> {
 
 impl<E: Element + 'static> QueueBehavior<E> for QueueVec<E> {
   fn len(&self) -> QueueSize {
-    let mg = self.values.lock().unwrap();
+    let mg = self.elements.lock().unwrap();
     let len = mg.len();
     QueueSize::Limited(len)
   }
@@ -57,7 +69,7 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueVec<E> {
 
   fn offer(&mut self, element: E) -> Result<()> {
     if self.non_full() {
-      let mut mg = self.values.lock().unwrap();
+      let mut mg = self.elements.lock().unwrap();
       mg.push_back(element);
       Ok(())
     } else {
@@ -66,21 +78,21 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueVec<E> {
   }
 
   fn poll(&mut self) -> Result<Option<E>> {
-    let mut mg = self.values.lock().unwrap();
+    let mut mg = self.elements.lock().unwrap();
     Ok(mg.pop_front())
   }
 }
 
 impl<E: Element + 'static> HasPeekBehavior<E> for QueueVec<E> {
   fn peek(&self) -> Result<Option<E>> {
-    let mg = self.values.lock().unwrap();
+    let mg = self.elements.lock().unwrap();
     Ok(mg.front().map(|e| e.clone()))
   }
 }
 
 impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for QueueVec<E> {
   fn contains(&self, element: &E) -> bool {
-    let mg = self.values.lock().unwrap();
+    let mg = self.elements.lock().unwrap();
     mg.contains(element)
   }
 }

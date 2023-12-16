@@ -397,6 +397,48 @@ pub enum Queue<T> {
 }
 
 impl<T: Element + 'static> Queue<T> {
+  pub fn as_vec_dequeue_mut(&mut self) -> Option<&mut QueueVec<T>> {
+    match self {
+      Queue::VecDequeue(inner) => Some(inner),
+      _ => None,
+    }
+  }
+
+  pub fn as_vec_dequeue(&self) -> Option<&QueueVec<T>> {
+    match self {
+      Queue::VecDequeue(inner) => Some(inner),
+      _ => None,
+    }
+  }
+
+  pub fn as_linked_list_mut(&mut self) -> Option<&mut QueueLinkedList<T>> {
+    match self {
+      Queue::LinkedList(inner) => Some(inner),
+      _ => None,
+    }
+  }
+
+  pub fn as_linked_list(&self) -> Option<&QueueLinkedList<T>> {
+    match self {
+      Queue::LinkedList(inner) => Some(inner),
+      _ => None,
+    }
+  }
+
+  pub fn as_mpsc_mut(&mut self) -> Option<&mut QueueMPSC<T>> {
+    match self {
+      Queue::MPSC(inner) => Some(inner),
+      _ => None,
+    }
+  }
+
+  pub fn as_mpsc(&self) -> Option<&QueueMPSC<T>> {
+    match self {
+      Queue::MPSC(inner) => Some(inner),
+      _ => None,
+    }
+  }
+
   /// Converts the queue to a blocking queue.<br/>
   /// キューをブロッキングキューに変換します。
   ///
@@ -406,6 +448,11 @@ impl<T: Element + 'static> Queue<T> {
     BlockingQueue::new(self)
   }
 
+  /// Gets an iterator for this queue.
+  /// このキューのイテレータを取得します。
+  ///
+  /// # Return Value / 戻り値
+  /// - `QueueIter<T, Queue<T>>` - An iterator for this queue. / このキューのイテレータ。
   pub fn iter(&mut self) -> QueueIter<T, Queue<T>> {
     QueueIter {
       q: self,

@@ -58,6 +58,8 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
 }
 
 impl<E: Element + 'static> QueueMPSC<E> {
+  /// Create a new `QueueMPSC`.<br/>
+  /// 新しい `QueueMPSC` を作成します。
   pub fn new() -> Self {
     let (tx, rx) = channel();
     Self {
@@ -70,6 +72,11 @@ impl<E: Element + 'static> QueueMPSC<E> {
     }
   }
 
+  /// Update the maximum number of elements in the queue.<br/>
+  /// キューの最大要素数を更新します。
+  ///
+  /// # Arguments / 引数
+  /// - `capacity` - The maximum number of elements in the queue. / キューの最大要素数。
   pub fn with_capacity(self, capacity: QueueSize) -> Self {
     {
       let mut inner_guard = self.inner.lock().unwrap();
@@ -78,8 +85,13 @@ impl<E: Element + 'static> QueueMPSC<E> {
     self
   }
 
-  pub fn with_elements(mut self, values: impl IntoIterator<Item = E> + ExactSizeIterator) -> Self {
-    self.offer_all(values).unwrap();
+  /// Update the elements in the queue.<br/>
+  /// キューの要素を更新します。
+  ///
+  /// # Arguments / 引数
+  /// - `elements` - The elements to be updated. / 更新する要素。
+  pub fn with_elements(mut self, elements: impl IntoIterator<Item = E> + ExactSizeIterator) -> Self {
+    self.offer_all(elements).unwrap();
     self
   }
 
