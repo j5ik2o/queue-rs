@@ -489,9 +489,7 @@ mod tests {
 
   fn populated_blocking_queue(queue_type: QueueType, size: QueueSize) -> BlockingQueue<i32, Queue<i32>> {
     let mut q = create_blocking_queue(queue_type, size.clone());
-    for i in 0..size.to_usize() {
-      q.offer(i as i32).unwrap();
-    }
+    q.offer_all((0..size.to_usize() as i32).into_iter()).unwrap();
     q
   }
 
