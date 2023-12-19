@@ -172,8 +172,8 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
     log::debug!("interrupt: start...");
     self.is_interrupted.store(true, Ordering::Relaxed);
     let (_, not_full, not_empty) = &*self.underlying;
-    not_empty.notify_one();
-    not_full.notify_one();
+    not_empty.notify_all();
+    not_full.notify_all();
     log::debug!("interrupt: end...");
   }
 
