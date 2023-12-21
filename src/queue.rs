@@ -17,6 +17,8 @@ mod blocking_queue_test;
 mod queue_linkedlist;
 mod queue_mpsc;
 mod queue_vec;
+#[cfg(feature = "tokio-support")]
+pub mod tokio;
 
 /// A trait that represents an element.<br/>
 /// 要素を表すトレイト。
