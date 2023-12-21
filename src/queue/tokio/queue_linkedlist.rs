@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use crate::queue::tokio::{HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueIntoIter};
+use crate::queue::tokio::{HasContainsBehavior, HasPeekBehavior, QueueBehavior};
 use crate::queue::{Element, QueueError, QueueIter, QueueSize};
 
 /// A queue implementation backed by a `LinkedList`.<br/>
@@ -40,7 +40,7 @@ impl<E: Element + 'static> QueueLinkedList<E> {
   ///
   /// # Arguments / 引数
   /// - `elements` - The elements to be updated.<br/>
-  pub fn with_elements(mut self, elements: impl IntoIterator<Item = E> + ExactSizeIterator) -> Self {
+  pub fn with_elements(mut self, elements: impl IntoIterator<Item = E>) -> Self {
     let vec = elements.into_iter().collect::<LinkedList<E>>();
     self.elements = Arc::new(Mutex::new(vec));
     self
@@ -67,7 +67,7 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueLinkedList<E> {
   }
 
   async fn offer(&mut self, element: E) -> anyhow::Result<()> {
-    if self.non_full() {
+    if self.non_full().await {
       let mut mg = self.elements.lock().await;
       mg.push_back(element);
       Ok(())
@@ -95,17 +95,5 @@ impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for QueueLinkedLis
   async fn contains(&self, element: &E) -> bool {
     let mg = self.elements.lock().await;
     mg.contains(element)
-  }
-}
-
-impl<E: Element + 'static> IntoIterator for QueueLinkedList<E> {
-  type IntoIter = QueueIntoIter<E, QueueLinkedList<E>>;
-  type Item = E;
-
-  fn into_iter(self) -> Self::IntoIter {
-    QueueIntoIter {
-      q: self,
-      p: PhantomData,
-    }
   }
 }

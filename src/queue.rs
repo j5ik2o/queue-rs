@@ -14,11 +14,11 @@ pub use queue_vec::*;
 use crate::queue::queue_linkedlist::QueueLinkedList;
 
 mod blocking_queue;
+#[cfg(test)]
 mod blocking_queue_test;
 mod queue_linkedlist;
 mod queue_mpsc;
 mod queue_vec;
-#[cfg(feature = "tokio-support")]
 pub mod tokio;
 
 /// A trait that represents an element.<br/>
@@ -301,6 +301,8 @@ pub trait HasContainsBehavior<E: Element>: QueueBehavior<E> {
   fn contains(&self, element: &E) -> bool;
 }
 
+/// A trait that defines the behavior of a blocking queue.<br/>
+/// ブロッキングキューの振る舞いを定義するトレイト。
 pub trait BlockingQueueBehavior<E: Element>: QueueBehavior<E> + Send {
   /// Inserts the specified element into this queue. If necessary, waits until space is available.<br/>
   /// 指定された要素をこのキューに挿入します。必要に応じて、空きが生じるまで待機します。
@@ -387,7 +389,7 @@ pub enum QueueType {
 /// An enumeration type that represents a queue.<br/>
 /// キューを表す列挙型。
 #[derive(Debug, Clone)]
-pub enum Queue<T> {
+pub enum Queue<T: Element> {
   /// A queue implemented with a vector.<br/>
   /// ベクタで実装されたキュー。
   VecDequeue(QueueVec<T>),
