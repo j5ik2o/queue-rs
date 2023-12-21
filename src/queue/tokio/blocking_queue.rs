@@ -1,15 +1,13 @@
-use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::Result;
+use tokio::sync::Mutex;
+use tokio_condvar::Condvar;
 
-use crate::queue::{
-  BlockingQueueBehavior, Element, HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueError, QueueIntoIter,
-  QueueIter, QueueSize,
-};
+use crate::queue::tokio::{BlockingQueueBehavior, HasContainsBehavior, HasPeekBehavior, QueueBehavior};
+use crate::queue::{Element, QueueError, QueueIntoIter, QueueIter, QueueSize};
 
 #[derive(Debug, Clone)]
 pub struct BlockingQueue<E, Q: QueueBehavior<E>> {
@@ -37,7 +35,7 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueue<E, Q> {
     }
   }
 
-  pub fn iter(&mut self) -> QueueIter<E, BlockingQueue<E, Q>> {
+  pub fn iter(&mut self) -> QueueIter<E, crate::queue::BlockingQueue<E, Q>> {
     QueueIter {
       q: self,
       p: PhantomData,
@@ -59,93 +57,96 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueue<E, Q> {
   }
 }
 
+#[async_trait::async_trait]
 impl<E: Element + 'static, Q: QueueBehavior<E>> QueueBehavior<E> for BlockingQueue<E, Q> {
-  fn len(&self) -> QueueSize {
+  async fn len(&self) -> QueueSize {
     let (queue_vec_mutex, _, _) = &*self.underlying;
-    let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
-    queue_vec_mutex_guard.len()
+    let queue_vec_mutex_guard = queue_vec_mutex.lock().await;
+    queue_vec_mutex_guard.len().await
   }
 
-  fn capacity(&self) -> QueueSize {
+  async fn capacity(&self) -> QueueSize {
     let (queue_vec_mutex, _, _) = &*self.underlying;
-    let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
-    queue_vec_mutex_guard.capacity()
+    let queue_vec_mutex_guard = queue_vec_mutex.lock().await;
+    queue_vec_mutex_guard.capacity().await
   }
 
-  fn offer(&mut self, element: E) -> Result<()> {
+  async fn offer(&mut self, element: E) -> anyhow::Result<()> {
     let (queue_vec_mutex, _, not_empty) = &*self.underlying;
-    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
-    let result = queue_vec_mutex_guard.offer(element);
+    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().await;
+    let result = queue_vec_mutex_guard.offer(element).await;
     not_empty.notify_one();
     result
   }
 
-  fn offer_all(&mut self, elements: impl IntoIterator<Item = E>) -> Result<()> {
+  async fn offer_all(&mut self, elements: impl IntoIterator<Item = E>) -> anyhow::Result<()> {
     let (queue_vec_mutex, _, not_empty) = &*self.underlying;
-    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
-    let result = queue_vec_mutex_guard.offer_all(elements);
+    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().await;
+    let result = queue_vec_mutex_guard.offer_all(elements).await;
     not_empty.notify_one();
     result
   }
 
-  fn poll(&mut self) -> Result<Option<E>> {
+  async fn poll(&mut self) -> anyhow::Result<Option<E>> {
     let (queue_vec_mutex, not_full, _) = &*self.underlying;
-    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
-    let result = queue_vec_mutex_guard.poll();
+    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().await;
+    let result = queue_vec_mutex_guard.poll().await;
     not_full.notify_one();
     result
   }
 }
 
+#[async_trait::async_trait]
 impl<E: Element + 'static, Q: QueueBehavior<E> + HasPeekBehavior<E>> HasPeekBehavior<E> for BlockingQueue<E, Q> {
-  fn peek(&self) -> Result<Option<E>> {
+  async fn peek(&self) -> anyhow::Result<Option<E>> {
     let (queue_vec_mutex, not_full, _) = &*self.underlying;
-    let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
-    let result = queue_vec_mutex_guard.peek();
+    let queue_vec_mutex_guard = queue_vec_mutex.lock().await;
+    let result = queue_vec_mutex_guard.peek().await;
     not_full.notify_one();
     result
   }
 }
 
-impl<E: Element + 'static, Q: QueueBehavior<E> + HasContainsBehavior<E>> HasContainsBehavior<E>
+#[async_trait::async_trait]
+impl<E: Element + 'static, Q: crate::queue::QueueBehavior<E> + HasContainsBehavior<E>> HasContainsBehavior<E>
   for BlockingQueue<E, Q>
 {
-  fn contains(&self, element: &E) -> bool {
+  async fn contains(&self, element: &E) -> bool {
     let (queue_vec_mutex, _, _) = &*self.underlying;
-    let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
-    let result = queue_vec_mutex_guard.contains(element);
+    let queue_vec_mutex_guard = queue_vec_mutex.lock().await;
+    let result = queue_vec_mutex_guard.contains(element).await;
     result
   }
 }
 
 impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for BlockingQueue<E, Q> {
-  fn put(&mut self, element: E) -> Result<()> {
+  async fn put(&mut self, element: E) -> anyhow::Result<()> {
     let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
-    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().await;
     while queue_vec_mutex_guard.is_full() {
       if self.check_and_update_interrupted() {
         log::debug!("put: return by interrupted");
         return Err(QueueError::<E>::InterruptedError.into());
       }
       log::debug!("put: blocking start...");
-      queue_vec_mutex_guard = not_full.wait(queue_vec_mutex_guard).unwrap();
+      queue_vec_mutex_guard = not_full.wait(queue_vec_mutex_guard).await;
       log::debug!("put: blocking end...");
     }
-    let result = queue_vec_mutex_guard.offer(element);
+    let result = queue_vec_mutex_guard.offer(element).await;
     not_empty.notify_one();
     result
   }
 
-  fn put_timeout(&mut self, element: E, timeout: Duration) -> Result<()> {
+  async fn put_timeout(&mut self, element: E, timeout: Duration) -> anyhow::Result<()> {
     let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
-    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().await;
     while queue_vec_mutex_guard.is_full() {
       if self.check_and_update_interrupted() {
         log::debug!("put: return by interrupted");
         return Err(QueueError::<E>::InterruptedError.into());
       }
       log::debug!("put: blocking start...");
-      let (mg, wtr) = not_full.wait_timeout(queue_vec_mutex_guard, timeout).unwrap();
+      let (mg, wtr) = not_full.wait_timeout(queue_vec_mutex_guard, timeout).await;
       if wtr.timed_out() {
         log::debug!("put: blocking timeout...");
         return Err(QueueError::<E>::TimeoutError.into());
@@ -153,38 +154,38 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
       queue_vec_mutex_guard = mg;
       log::debug!("put: blocking end...");
     }
-    let result = queue_vec_mutex_guard.offer(element);
+    let result = queue_vec_mutex_guard.offer(element).await;
     not_empty.notify_one();
     result
   }
 
-  fn take(&mut self) -> Result<Option<E>> {
+  async fn take(&mut self) -> anyhow::Result<Option<E>> {
     let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
-    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().await;
     while queue_vec_mutex_guard.is_empty() {
       if self.check_and_update_interrupted() {
         log::debug!("take: return by interrupted");
         return Err(QueueError::<E>::InterruptedError.into());
       }
       log::debug!("take: blocking start...");
-      queue_vec_mutex_guard = not_empty.wait(queue_vec_mutex_guard).unwrap();
+      queue_vec_mutex_guard = not_empty.wait(queue_vec_mutex_guard).await;
       log::debug!("take: blocking end...");
     }
-    let result = queue_vec_mutex_guard.poll();
+    let result = queue_vec_mutex_guard.poll().await;
     not_full.notify_one();
     result
   }
 
-  fn take_timeout(&mut self, timeout: Duration) -> Result<Option<E>> {
+  async fn take_timeout(&mut self, timeout: Duration) -> anyhow::Result<Option<E>> {
     let (queue_vec_mutex, not_full, not_empty) = &*self.underlying;
-    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    let mut queue_vec_mutex_guard = queue_vec_mutex.lock().await;
     while queue_vec_mutex_guard.is_empty() {
       if self.check_and_update_interrupted() {
         log::debug!("take: return by interrupted");
         return Err(QueueError::<E>::InterruptedError.into());
       }
       log::debug!("take: blocking start...");
-      let (mg, wtr) = not_empty.wait_timeout(queue_vec_mutex_guard, timeout).unwrap();
+      let (mg, wtr) = not_empty.wait_timeout(queue_vec_mutex_guard, timeout).await;
       if wtr.timed_out() {
         log::debug!("take: blocking timeout...");
         return Err(QueueError::<E>::TimeoutError.into());
@@ -192,16 +193,16 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
       queue_vec_mutex_guard = mg;
       log::debug!("take: blocking end...");
     }
-    let result = queue_vec_mutex_guard.poll();
+    let result = queue_vec_mutex_guard.poll().await;
     not_full.notify_one();
     result
   }
 
-  fn remaining_capacity(&self) -> QueueSize {
+  async fn remaining_capacity(&self) -> QueueSize {
     let (queue_vec_mutex, _, _) = &*self.underlying;
-    let queue_vec_mutex_guard = queue_vec_mutex.lock().unwrap();
+    let queue_vec_mutex_guard = queue_vec_mutex.lock().await;
     let capacity = queue_vec_mutex_guard.capacity();
-    let len = queue_vec_mutex_guard.len();
+    let len = queue_vec_mutex_guard.len().await;
     match (capacity.clone(), len.clone()) {
       (QueueSize::Limited(capacity), QueueSize::Limited(len)) => QueueSize::Limited(capacity - len),
       (QueueSize::Limitless, _) => QueueSize::Limitless,
@@ -209,7 +210,7 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
     }
   }
 
-  fn interrupt(&mut self) {
+  async fn interrupt(&mut self) {
     log::debug!("interrupt: start...");
     self.is_interrupted.store(true, Ordering::Relaxed);
     let (_, not_full, not_empty) = &*self.underlying;
@@ -218,7 +219,7 @@ impl<E: Element + 'static, Q: QueueBehavior<E>> BlockingQueueBehavior<E> for Blo
     log::debug!("interrupt: end...");
   }
 
-  fn is_interrupted(&self) -> bool {
+  async fn is_interrupted(&self) -> bool {
     self.is_interrupted.load(Ordering::Relaxed)
   }
 }

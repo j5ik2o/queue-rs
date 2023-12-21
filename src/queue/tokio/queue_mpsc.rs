@@ -1,11 +1,12 @@
-use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::sync::mpsc::{channel, Receiver, SendError, Sender, TryRecvError};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
-use anyhow::Result;
+use tokio::sync::mpsc::error::{SendError, TryRecvError};
+use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::Mutex;
 
-use crate::queue::{Element, QueueBehavior, QueueError, QueueIntoIter, QueueIter, QueueSize};
+use crate::queue::tokio::QueueBehavior;
+use crate::queue::{Element, QueueError, QueueIntoIter, QueueIter, QueueSize};
 
 /// A queue implementation backed by a `MPSC`.<br/>
 /// `QueueMPSC` で実装されたキュー。
@@ -25,8 +26,8 @@ struct QueueMPSCInner<E> {
 impl<E: Element + 'static> QueueMPSC<E> {
   /// Create a new `QueueMPSC`.<br/>
   /// 新しい `QueueMPSC` を作成します。
-  pub fn new() -> Self {
-    let (tx, rx) = channel();
+  pub fn new(buffer_size: usize) -> Self {
+    let (tx, rx) = channel(buffer_size);
     Self {
       inner: Arc::new(Mutex::new(QueueMPSCInner {
         rx,
@@ -60,7 +61,7 @@ impl<E: Element + 'static> QueueMPSC<E> {
     self
   }
 
-  pub fn iter(&mut self) -> QueueIter<E, QueueMPSC<E>> {
+  pub fn iter(&mut self) -> QueueIter<E, crate::queue::QueueMPSC<E>> {
     QueueIter {
       q: self,
       p: PhantomData,
@@ -68,21 +69,22 @@ impl<E: Element + 'static> QueueMPSC<E> {
   }
 }
 
+#[async_trait::async_trait]
 impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
-  fn len(&self) -> QueueSize {
-    let inner_guard = self.inner.lock().unwrap();
+  async fn len(&self) -> QueueSize {
+    let inner_guard = self.inner.lock().await;
     inner_guard.count.clone()
   }
 
-  fn capacity(&self) -> QueueSize {
-    let inner_guard = self.inner.lock().unwrap();
+  async fn capacity(&self) -> QueueSize {
+    let inner_guard = self.inner.lock().await;
     inner_guard.capacity.clone()
   }
 
-  fn offer(&mut self, element: E) -> Result<()> {
+  async fn offer(&mut self, element: E) -> anyhow::Result<()> {
     match self.tx.send(element) {
       Ok(_) => {
-        let mut inner_guard = self.inner.lock().unwrap();
+        let mut inner_guard = self.inner.lock().await;
         inner_guard.count.increment();
         Ok(())
       }
@@ -90,8 +92,8 @@ impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
     }
   }
 
-  fn poll(&mut self) -> Result<Option<E>> {
-    let mut inner_guard = self.inner.lock().unwrap();
+  async fn poll(&mut self) -> anyhow::Result<Option<E>> {
+    let mut inner_guard = self.inner.lock().await;
     match inner_guard.rx.try_recv() {
       Ok(element) => {
         inner_guard.count.decrement();
