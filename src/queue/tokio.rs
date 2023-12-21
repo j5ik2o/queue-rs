@@ -1,9 +1,14 @@
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use crate::queue::{Element, Queue, QueueSize};
+use crate::queue::tokio::blocking_queue::BlockingQueue;
+use crate::queue::tokio::queue_linkedlist::QueueLinkedList;
+use crate::queue::tokio::queue_mpsc::QueueMPSC;
+use crate::queue::tokio::queue_vec::QueueVec;
+use crate::queue::{Element, QueueSize};
 
 mod blocking_queue;
+mod blocking_queue_test;
 mod queue_linkedlist;
 mod queue_mpsc;
 mod queue_vec;
@@ -203,6 +208,86 @@ pub trait BlockingQueueBehavior<E: Element>: QueueBehavior<E> + Send {
   /// - `true` - If the operation is interrupted. / 操作が中断された場合。
   /// - `false` - If the operation is not interrupted. / 操作が中断されていない場合。
   async fn is_interrupted(&self) -> bool;
+}
+
+/// An enumeration type that represents a queue.<br/>
+/// キューを表す列挙型。
+#[derive(Debug, Clone)]
+pub enum Queue<T> {
+  /// A queue implemented with a vector.<br/>
+  /// ベクタで実装されたキュー。
+  VecDequeue(QueueVec<T>),
+  /// A queue implemented with LinkedList.<br/>
+  /// LinkedListで実装されたキュー。
+  LinkedList(QueueLinkedList<T>),
+  /// A queue implemented with MPSC.<br/>
+  /// MPSCで実装されたキュー。
+  MPSC(QueueMPSC<T>),
+}
+
+impl<T: Element + 'static> Queue<T> {
+  pub fn as_vec_dequeue_mut(&mut self) -> Option<&mut QueueVec<T>> {
+    match self {
+      Queue::VecDequeue(inner) => Some(inner),
+      _ => None,
+    }
+  }
+
+  pub fn as_vec_dequeue(&self) -> Option<&QueueVec<T>> {
+    match self {
+      Queue::VecDequeue(inner) => Some(inner),
+      _ => None,
+    }
+  }
+
+  pub fn as_linked_list_mut(&mut self) -> Option<&mut QueueLinkedList<T>> {
+    match self {
+      crate::queue::Queue::LinkedList(inner) => Some(inner),
+      _ => None,
+    }
+  }
+
+  pub fn as_linked_list(&self) -> Option<&QueueLinkedList<T>> {
+    match self {
+      crate::queue::Queue::LinkedList(inner) => Some(inner),
+      _ => None,
+    }
+  }
+
+  pub fn as_mpsc_mut(&mut self) -> Option<&mut QueueMPSC<T>> {
+    match self {
+      crate::queue::Queue::MPSC(inner) => Some(inner),
+      _ => None,
+    }
+  }
+
+  pub fn as_mpsc(&self) -> Option<&QueueMPSC<T>> {
+    match self {
+      crate::queue::Queue::MPSC(inner) => Some(inner),
+      _ => None,
+    }
+  }
+
+  /// Converts the queue to a blocking queue.<br/>
+  /// キューをブロッキングキューに変換します。
+  ///
+  /// # Return Value / 戻り値
+  /// - `BlockingQueue<T, Queue<T>>` - A blocking queue. / ブロッキングキュー。
+  pub fn with_blocking(self) -> BlockingQueue<T, Queue<T>> {
+    BlockingQueue::new(self)
+  }
+
+  /// Gets an iterator for this queue.
+  /// このキューのイテレータを取得します。
+  ///
+  /// # Return Value / 戻り値
+  /// - `QueueIter<T, Queue<T>>` - An iterator for this queue. / このキューのイテレータ。
+  pub fn iter(&mut self) -> crate::queue::QueueIter<T, Queue<T>> {
+    crate::queue::QueueIter {
+      q: self,
+      p: PhantomData,
+    }
+  }
 }
 
 impl<E: Element + 'static> IntoIterator for Queue<E> {
