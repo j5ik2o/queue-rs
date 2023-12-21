@@ -1,11 +1,15 @@
+use futures::Stream;
+use std::future::Future;
 use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use crate::queue::tokio::blocking_queue::BlockingQueue;
 use crate::queue::tokio::queue_linkedlist::QueueLinkedList;
 use crate::queue::tokio::queue_mpsc::QueueMPSC;
 use crate::queue::tokio::queue_vec::QueueVec;
-use crate::queue::{Element, QueueSize};
+use crate::queue::{Element, QueueSize, QueueType};
 
 mod blocking_queue;
 mod blocking_queue_test;
@@ -16,7 +20,7 @@ mod queue_vec;
 /// A trait that defines the behavior of a queue.<br/>
 /// キューの振る舞いを定義するトレイト。
 #[async_trait::async_trait]
-pub trait QueueBehavior<E>: Send + Sized {
+pub trait QueueBehavior<E: Element>: Send + Sized + Sync {
   /// Returns whether this queue is empty.<br/>
   /// このキューが空かどうかを返します。
   ///
@@ -24,7 +28,7 @@ pub trait QueueBehavior<E>: Send + Sized {
   /// - `true` - If the queue is empty. / キューが空の場合。
   /// - `false` - If the queue is not empty. / キューが空でない場合。
   async fn is_empty(&self) -> bool {
-    self.len() == QueueSize::Limited(0)
+    self.len().await == QueueSize::Limited(0)
   }
 
   /// Returns whether this queue is non-empty.<br/>
@@ -34,7 +38,7 @@ pub trait QueueBehavior<E>: Send + Sized {
   /// - `true` - If the queue is not empty. / キューが空でない場合。
   /// - `false` - If the queue is empty. / キューが空の場合。
   async fn non_empty(&self) -> bool {
-    !self.is_empty()
+    !self.is_empty().await
   }
 
   /// Returns whether the queue size has reached its capacity.<br/>
@@ -44,7 +48,7 @@ pub trait QueueBehavior<E>: Send + Sized {
   /// - `true` - If the queue size has reached its capacity. / キューのサイズが容量まで到達した場合。
   /// - `false` - If the queue size has not reached its capacity. / キューのサイズが容量まで到達してない場合。
   async fn is_full(&self) -> bool {
-    self.capacity() == self.len()
+    self.capacity().await == self.len().await
   }
 
   /// Returns whether the queue size has not reached its capacity.<br/>
@@ -54,7 +58,7 @@ pub trait QueueBehavior<E>: Send + Sized {
   /// - `true` - If the queue size has not reached its capacity. / キューのサイズが容量まで到達してない場合。
   /// - `false` - If the queue size has reached its capacity. / キューのサイズが容量まで到達した場合。
   async fn non_full(&self) -> bool {
-    !self.is_full()
+    !self.is_full().await
   }
 
   /// Returns the length of this queue.<br/>
@@ -95,9 +99,10 @@ pub trait QueueBehavior<E>: Send + Sized {
   /// # Return Value / 戻り値
   /// - `Ok(())` - If the elements are inserted successfully. / 要素が正常に挿入された場合。
   /// - `Err(QueueError::OfferError(element))` - If the elements cannot be inserted. / 要素を挿入できなかった場合。
-  async fn offer_all(&mut self, elements: impl IntoIterator<Item = E>) -> anyhow::Result<()> {
+  async fn offer_all(&mut self, elements: impl IntoIterator<Item = E> + Send) -> anyhow::Result<()> {
+    let elements: Vec<E> = elements.into_iter().collect();
     for e in elements {
-      self.offer(e)?;
+      self.offer(e).await?;
     }
     Ok(())
   }
@@ -154,19 +159,6 @@ pub trait BlockingQueueBehavior<E: Element>: QueueBehavior<E> + Send {
   /// - `Err(QueueError::InterruptedError)` - If the operation is interrupted. / 操作が中断された場合。
   async fn put(&mut self, element: E) -> anyhow::Result<()>;
 
-  /// Inserts the specified element into this queue. If necessary, waits until space is available. You can specify the waiting time.<br/>
-  /// 指定された要素をこのキューに挿入します。必要に応じて、空きが生じるまで待機します。待機時間を指定できます。
-  ///
-  /// # Arguments / 引数
-  /// - `element` - The element to be inserted. / 挿入する要素。
-  ///
-  /// # Return Value / 戻り値
-  /// - `Ok(())` - If the element is inserted successfully. / 要素が正常に挿入された場合。
-  /// - `Err(QueueError::OfferError(element))` - If the element cannot be inserted. / 要素を挿入できなかった場合。
-  /// - `Err(QueueError::InterruptedError)` - If the operation is interrupted. / 操作が中断された場合。
-  /// - `Err(QueueError::TimeoutError)` - If the operation times out. / 操作がタイムアウトした場合。
-  async fn put_timeout(&mut self, element: E, timeout: Duration) -> anyhow::Result<()>;
-
   /// Retrieve the head of this queue and delete it. If necessary, wait until an element becomes available.<br/>
   /// このキューの先頭を取得して削除します。必要に応じて、要素が利用可能になるまで待機します。
   ///
@@ -175,19 +167,6 @@ pub trait BlockingQueueBehavior<E: Element>: QueueBehavior<E> + Send {
   /// - `Ok(None)` - If the queue is empty. / キューが空の場合。
   /// - `Err(QueueError::InterruptedError)` - If the operation is interrupted. / 操作が中断された場合。
   async fn take(&mut self) -> anyhow::Result<Option<E>>;
-
-  /// Retrieve the head of this queue and delete it. If necessary, wait until an element becomes available. You can specify the waiting time.<br/>
-  /// このキューの先頭を取得して削除します。必要に応じて、要素が利用可能になるまで待機します。待機時間を指定できます。
-  ///
-  /// # Arguments / 引数
-  /// - `timeout` - The maximum time to wait. / 待機する最大時間。
-  ///
-  /// # Return Value / 戻り値
-  /// - `Ok(Some(element))` - If the element is retrieved successfully. / 要素が正常に取得された場合。
-  /// - `Ok(None)` - If the queue is empty. / キューが空の場合。
-  /// - `Err(QueueError::InterruptedError)` - If the operation is interrupted. / 操作が中断された場合。
-  /// - `Err(QueueError::TimeoutError)` - If the operation times out. / 操作がタイムアウトした場合。
-  async fn take_timeout(&mut self, timeout: Duration) -> anyhow::Result<Option<E>>;
 
   /// Returns the number of elements that can be inserted into this queue without blocking.<br/>
   /// ブロックせずにこのキューに挿入できる要素数を返します。
@@ -242,28 +221,28 @@ impl<T: Element + 'static> Queue<T> {
 
   pub fn as_linked_list_mut(&mut self) -> Option<&mut QueueLinkedList<T>> {
     match self {
-      crate::queue::Queue::LinkedList(inner) => Some(inner),
+      Queue::LinkedList(inner) => Some(inner),
       _ => None,
     }
   }
 
   pub fn as_linked_list(&self) -> Option<&QueueLinkedList<T>> {
     match self {
-      crate::queue::Queue::LinkedList(inner) => Some(inner),
+      Queue::LinkedList(inner) => Some(inner),
       _ => None,
     }
   }
 
   pub fn as_mpsc_mut(&mut self) -> Option<&mut QueueMPSC<T>> {
     match self {
-      crate::queue::Queue::MPSC(inner) => Some(inner),
+      Queue::MPSC(inner) => Some(inner),
       _ => None,
     }
   }
 
   pub fn as_mpsc(&self) -> Option<&QueueMPSC<T>> {
     match self {
-      crate::queue::Queue::MPSC(inner) => Some(inner),
+      Queue::MPSC(inner) => Some(inner),
       _ => None,
     }
   }
@@ -290,52 +269,127 @@ impl<T: Element + 'static> Queue<T> {
   }
 }
 
-impl<E: Element + 'static> IntoIterator for Queue<E> {
-  type IntoIter = QueueIntoIter<E, Queue<E>>;
-  type Item = E;
+#[async_trait::async_trait]
+impl<T: Element + 'static> QueueBehavior<T> for Queue<T> {
+  async fn len(&self) -> QueueSize {
+    match self {
+      Queue::VecDequeue(inner) => inner.len().await,
+      Queue::LinkedList(inner) => inner.len().await,
+      Queue::MPSC(inner) => inner.len().await,
+    }
+  }
 
-  fn into_iter(self) -> Self::IntoIter {
-    QueueIntoIter {
-      q: self,
-      p: PhantomData,
+  async fn capacity(&self) -> QueueSize {
+    match self {
+      Queue::VecDequeue(inner) => inner.capacity().await,
+      Queue::LinkedList(inner) => inner.capacity().await,
+      Queue::MPSC(inner) => inner.capacity().await,
+    }
+  }
+
+  async fn offer(&mut self, element: T) -> anyhow::Result<()> {
+    match self {
+      Queue::VecDequeue(inner) => inner.offer(element).await,
+      Queue::LinkedList(inner) => inner.offer(element).await,
+      Queue::MPSC(inner) => inner.offer(element).await,
+    }
+  }
+
+  async fn offer_all(&mut self, elements: impl IntoIterator<Item = T> + Send) -> anyhow::Result<()> {
+    match self {
+      Queue::VecDequeue(inner) => inner.offer_all(elements).await,
+      Queue::LinkedList(inner) => inner.offer_all(elements).await,
+      Queue::MPSC(inner) => inner.offer_all(elements).await,
+    }
+  }
+
+  async fn poll(&mut self) -> anyhow::Result<Option<T>> {
+    match self {
+      Queue::VecDequeue(inner) => inner.poll().await,
+      Queue::LinkedList(inner) => inner.poll().await,
+      Queue::MPSC(inner) => inner.poll().await,
     }
   }
 }
 
-pub struct QueueIntoIter<E, Q> {
+#[async_trait::async_trait]
+impl<E: Element + 'static> HasPeekBehavior<E> for Queue<E> {
+  async fn peek(&self) -> anyhow::Result<Option<E>> {
+    match self {
+      Queue::VecDequeue(inner) => inner.peek().await,
+      Queue::LinkedList(inner) => inner.peek().await,
+      Queue::MPSC(_) => panic!("Not supported implementation."),
+    }
+  }
+}
+
+#[async_trait::async_trait]
+impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for Queue<E> {
+  async fn contains(&self, element: &E) -> bool {
+    match self {
+      Queue::VecDequeue(inner) => inner.contains(element).await,
+      Queue::LinkedList(inner) => inner.contains(element).await,
+      Queue::MPSC(_) => panic!("Not supported implementation."),
+    }
+  }
+}
+
+pub struct QueueIter<E, Q> {
   q: Q,
+  current_future: Option<Pin<Box<dyn Future<Output = Result<Option<E>, anyhow::Error>> + Send>>>,
   p: PhantomData<E>,
 }
 
-impl<E, Q: QueueBehavior<E>> Iterator for QueueIntoIter<E, Q> {
+impl<E: Element + Unpin + 'static, Q: QueueBehavior<E> + Unpin> Stream for QueueIter<E, Q> {
   type Item = E;
 
-  fn next(&mut self) -> Option<Self::Item> {
-    self.q.poll().ok().flatten()
+  fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    let bq = &mut self.get_mut().q;
+    match Pin::new(&mut bq.poll()).poll(cx) {
+      Poll::Ready(Ok(Some(value))) => Poll::Ready(Some(value)),
+      Poll::Ready(Ok(None)) => Poll::Ready(None),
+      Poll::Pending => Poll::Pending,
+      _ => {
+        panic!("BlockingQueueIter: poll_next: unexpected error");
+      }
+    }
   }
 }
 
-impl<E: Element + 'static, Q: QueueBehavior<E>> ExactSizeIterator for QueueIntoIter<E, Q> {
-  fn len(&self) -> usize {
-    self.q.len().to_usize()
+pub async fn create_queue<T: Element + 'static>(queue_type: QueueType, queue_size: QueueSize) -> Queue<T> {
+  match (queue_type, &queue_size) {
+    (QueueType::VecDequeue, QueueSize::Limitless) => Queue::VecDequeue(QueueVec::<T>::new()),
+    (QueueType::VecDequeue, QueueSize::Limited(_)) => Queue::VecDequeue(QueueVec::<T>::new().with_capacity(queue_size)),
+    (QueueType::LinkedList, QueueSize::Limitless) => Queue::LinkedList(QueueLinkedList::<T>::new()),
+    (QueueType::LinkedList, QueueSize::Limited(_)) => {
+      Queue::LinkedList(QueueLinkedList::<T>::new().with_capacity(queue_size))
+    }
+    (QueueType::MPSC, QueueSize::Limitless) => Queue::MPSC(QueueMPSC::<T>::new(queue_size.to_usize())),
+    (QueueType::MPSC, QueueSize::Limited(_)) => Queue::MPSC(
+      QueueMPSC::<T>::new(queue_size.to_usize())
+        .with_capacity(queue_size)
+        .await,
+    ),
   }
 }
 
-pub struct QueueIter<'a, E, Q> {
-  q: &'a mut Q,
-  p: PhantomData<E>,
-}
-
-impl<'a, E, Q: QueueBehavior<E>> Iterator for QueueIter<'a, E, Q> {
-  type Item = E;
-
-  fn next(&mut self) -> Option<Self::Item> {
-    self.q.poll().unwrap()
-  }
-}
-
-impl<'a, E: Element + 'static, Q: QueueBehavior<E>> ExactSizeIterator for QueueIter<'a, E, Q> {
-  fn len(&self) -> usize {
-    self.q.len().to_usize()
+pub async fn create_queue_with_elements<T: Element + 'static>(
+  queue_type: QueueType,
+  queue_size: QueueSize,
+  values: impl IntoIterator<Item = T> + Send,
+) -> Queue<T> {
+  let vec = values.into_iter().collect::<Vec<_>>();
+  match queue_type {
+    QueueType::VecDequeue => Queue::VecDequeue(QueueVec::<T>::new().with_capacity(queue_size).with_elements(vec)),
+    QueueType::LinkedList => {
+      Queue::LinkedList(QueueLinkedList::<T>::new().with_capacity(queue_size).with_elements(vec))
+    }
+    QueueType::MPSC => Queue::MPSC(
+      QueueMPSC::<T>::new(vec.len())
+        .with_capacity(queue_size)
+        .await
+        .with_elements(vec)
+        .await,
+    ),
   }
 }

@@ -18,7 +18,6 @@ mod blocking_queue_test;
 mod queue_linkedlist;
 mod queue_mpsc;
 mod queue_vec;
-#[cfg(feature = "tokio-support")]
 pub mod tokio;
 
 /// A trait that represents an element.<br/>
@@ -389,7 +388,7 @@ pub enum QueueType {
 /// An enumeration type that represents a queue.<br/>
 /// キューを表す列挙型。
 #[derive(Debug, Clone)]
-pub enum Queue<T> {
+pub enum Queue<T: Element> {
   /// A queue implemented with a vector.<br/>
   /// ベクタで実装されたキュー。
   VecDequeue(QueueVec<T>),

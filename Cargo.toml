@@ -13,12 +13,14 @@ repository = "https://github.com/j5ik2o/queue-rs"
 anyhow = "1.0.75"
 thiserror = "1.0.51"
 log = "0.4"
-tokio = { version = "1", features = ["sync"], optional = true }
-async-trait = { version = "0.1.74", optional = true }
-tokio-condvar = { version = "0.1.0", optional = true }
+tokio = { version = "1", features = ["sync","macros", "rt", "test-util"], optional = false }
+async-trait = { version = "0.1.74", optional = false }
+tokio-condvar = { version = "0.1.0", optional = false }
+futures = {  version = "0.3", optional = false }
 
-[features]
-tokio-support = ["tokio", "async-trait", "tokio-condvar"]
+
+#[features]
+#tokio-support = ["tokio", "async-trait", "tokio-condvar", "futures"]
 
 [dev-dependencies]
 env_logger = "0.10.1"
