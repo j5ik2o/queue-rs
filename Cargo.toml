@@ -13,10 +13,10 @@ repository = "https://github.com/j5ik2o/queue-rs"
 anyhow = "1.0.76"
 thiserror = "1.0.51"
 log = "0.4"
-tokio = { version = "1", features = ["sync","macros", "rt", "test-util"], optional = false }
+tokio = { version = "1", features = ["sync", "macros", "rt", "test-util"], optional = false }
 async-trait = { version = "0.1.74", optional = false }
 tokio-condvar = { version = "0.1.0", optional = false }
-futures = {  version = "0.3", optional = false }
+futures = { version = "0.3", optional = false }
 
 
 #[features]

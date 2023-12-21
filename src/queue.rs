@@ -14,6 +14,7 @@ pub use queue_vec::*;
 use crate::queue::queue_linkedlist::QueueLinkedList;
 
 mod blocking_queue;
+#[cfg(test)]
 mod blocking_queue_test;
 mod queue_linkedlist;
 mod queue_mpsc;

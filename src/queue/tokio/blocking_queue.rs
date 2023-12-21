@@ -1,12 +1,11 @@
-use futures::Stream;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time::Duration;
 
+use futures::Stream;
 use tokio::sync::Mutex;
 use tokio_condvar::Condvar;
 

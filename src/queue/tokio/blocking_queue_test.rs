@@ -1,9 +1,10 @@
+extern crate env_logger;
+
+use std::env;
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures::StreamExt;
-use std::sync::Arc;
-use std::{env, thread};
-
 use serial_test::serial;
 use tokio::sync::Mutex;
 use tokio_condvar::Condvar;
@@ -13,10 +14,6 @@ use crate::queue::tokio::{
   create_queue, create_queue_with_elements, BlockingQueueBehavior, HasContainsBehavior, Queue, QueueBehavior,
 };
 use crate::queue::{QueueError, QueueSize, QueueType};
-
-use super::*;
-
-extern crate env_logger;
 
 fn init_logger() {
   env::set_var("RUST_LOG", "debug");
@@ -265,7 +262,7 @@ async fn test_offer_all() {
 }
 
 #[tokio::test]
-//#[serial]
+#[serial]
 async fn test_put() {
   init_logger();
 

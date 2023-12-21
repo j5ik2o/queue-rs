@@ -6,7 +6,7 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::Mutex;
 
 use crate::queue::tokio::QueueBehavior;
-use crate::queue::{Element, QueueError, QueueIntoIter, QueueIter, QueueSize};
+use crate::queue::{Element, QueueError, QueueIter, QueueSize};
 
 /// A queue implementation backed by a `MPSC`.<br/>
 /// `QueueMPSC` で実装されたキュー。

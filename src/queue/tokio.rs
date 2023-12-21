@@ -1,9 +1,9 @@
-use futures::Stream;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
+
+use futures::Stream;
 
 use crate::queue::tokio::blocking_queue::BlockingQueue;
 use crate::queue::tokio::queue_linkedlist::QueueLinkedList;
@@ -12,6 +12,7 @@ use crate::queue::tokio::queue_vec::QueueVec;
 use crate::queue::{Element, QueueSize, QueueType};
 
 mod blocking_queue;
+#[cfg(test)]
 mod blocking_queue_test;
 mod queue_linkedlist;
 mod queue_mpsc;
