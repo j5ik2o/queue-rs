@@ -7,10 +7,11 @@ use std::time::Duration;
 use anyhow::Result;
 use thiserror::Error;
 
-use crate::queue::queue_linkedlist::QueueLinkedList;
 pub use blocking_queue::*;
 pub use queue_mpsc::*;
 pub use queue_vec::*;
+
+use crate::queue::queue_linkedlist::QueueLinkedList;
 
 mod blocking_queue;
 mod blocking_queue_test;
@@ -549,6 +550,7 @@ impl<E, Q: QueueBehavior<E>> Iterator for QueueIntoIter<E, Q> {
     self.q.poll().ok().flatten()
   }
 }
+
 impl<E: Element + 'static, Q: QueueBehavior<E>> ExactSizeIterator for QueueIntoIter<E, Q> {
   fn len(&self) -> usize {
     self.q.len().to_usize()

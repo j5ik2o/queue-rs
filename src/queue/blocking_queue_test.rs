@@ -1,5 +1,6 @@
-use crate::queue::{BlockingQueueBehavior, QueueError, QueueSize};
 use std::time::Duration;
+
+use crate::queue::{BlockingQueueBehavior, QueueError, QueueSize};
 
 #[cfg(test)]
 mod tests {

@@ -1,10 +1,12 @@
-use crate::queue::tokio::QueueBehavior;
-use crate::queue::{Element, QueueError, QueueIntoIter, QueueIter, QueueSize};
 use std::marker::PhantomData;
 use std::sync::Arc;
+
 use tokio::sync::mpsc::error::{SendError, TryRecvError};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::Mutex;
+
+use crate::queue::tokio::QueueBehavior;
+use crate::queue::{Element, QueueError, QueueIntoIter, QueueIter, QueueSize};
 
 /// A queue implementation backed by a `MPSC`.<br/>
 /// `QueueMPSC` で実装されたキュー。
@@ -21,41 +23,6 @@ struct QueueMPSCInner<E> {
   capacity: QueueSize,
 }
 
-#[async_trait::async_trait]
-impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
-  async fn len(&self) -> QueueSize {
-    let inner_guard = self.inner.lock().await;
-    inner_guard.count.clone()
-  }
-
-  async fn capacity(&self) -> QueueSize {
-    let inner_guard = self.inner.lock().await;
-    inner_guard.capacity.clone()
-  }
-
-  async fn offer(&mut self, element: E) -> anyhow::Result<()> {
-    match self.tx.send(element) {
-      Ok(_) => {
-        let mut inner_guard = self.inner.lock().await;
-        inner_guard.count.increment();
-        Ok(())
-      }
-      Err(SendError(err)) => Err(QueueError::OfferError(err).into()),
-    }
-  }
-
-  async fn poll(&mut self) -> anyhow::Result<Option<E>> {
-    let mut inner_guard = self.inner.lock().await;
-    match inner_guard.rx.try_recv() {
-      Ok(element) => {
-        inner_guard.count.decrement();
-        Ok(Some(element))
-      }
-      Err(TryRecvError::Empty) => Ok(None),
-      Err(TryRecvError::Disconnected) => Err(QueueError::<E>::PoolError.into()),
-    }
-  }
-}
 impl<E: Element + 'static> QueueMPSC<E> {
   /// Create a new `QueueMPSC`.<br/>
   /// 新しい `QueueMPSC` を作成します。
@@ -98,6 +65,42 @@ impl<E: Element + 'static> QueueMPSC<E> {
     QueueIter {
       q: self,
       p: PhantomData,
+    }
+  }
+}
+
+#[async_trait::async_trait]
+impl<E: Element + 'static> QueueBehavior<E> for QueueMPSC<E> {
+  async fn len(&self) -> QueueSize {
+    let inner_guard = self.inner.lock().await;
+    inner_guard.count.clone()
+  }
+
+  async fn capacity(&self) -> QueueSize {
+    let inner_guard = self.inner.lock().await;
+    inner_guard.capacity.clone()
+  }
+
+  async fn offer(&mut self, element: E) -> anyhow::Result<()> {
+    match self.tx.send(element) {
+      Ok(_) => {
+        let mut inner_guard = self.inner.lock().await;
+        inner_guard.count.increment();
+        Ok(())
+      }
+      Err(SendError(err)) => Err(QueueError::OfferError(err).into()),
+    }
+  }
+
+  async fn poll(&mut self) -> anyhow::Result<Option<E>> {
+    let mut inner_guard = self.inner.lock().await;
+    match inner_guard.rx.try_recv() {
+      Ok(element) => {
+        inner_guard.count.decrement();
+        Ok(Some(element))
+      }
+      Err(TryRecvError::Empty) => Ok(None),
+      Err(TryRecvError::Disconnected) => Err(QueueError::<E>::PoolError.into()),
     }
   }
 }

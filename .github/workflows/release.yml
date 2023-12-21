@@ -10,16 +10,16 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        persist-credentials: false
-        token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        override: true
-    - name: release the crate
-      run: |
-        cargo publish --token ${{ secrets.CARGO_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: release the crate
+        run: |
+          cargo publish --token ${{ secrets.CARGO_TOKEN }}

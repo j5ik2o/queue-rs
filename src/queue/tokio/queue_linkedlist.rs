@@ -1,9 +1,11 @@
-use crate::queue::tokio::{HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueIntoIter};
-use crate::queue::{Element, QueueError, QueueIter, QueueSize};
 use std::collections::LinkedList;
 use std::marker::PhantomData;
 use std::sync::Arc;
+
 use tokio::sync::Mutex;
+
+use crate::queue::tokio::{HasContainsBehavior, HasPeekBehavior, QueueBehavior, QueueIntoIter};
+use crate::queue::{Element, QueueError, QueueIter, QueueSize};
 
 /// A queue implementation backed by a `LinkedList`.<br/>
 /// `LinkedList` で実装されたキュー。
@@ -11,33 +13,6 @@ use tokio::sync::Mutex;
 pub struct QueueLinkedList<E> {
   elements: Arc<Mutex<LinkedList<E>>>,
   capacity: QueueSize,
-}
-
-impl<E: Element + 'static> QueueBehavior<E> for QueueLinkedList<E> {
-  async fn len(&self) -> QueueSize {
-    let mg = self.elements.lock().await;
-    let len = mg.len();
-    QueueSize::Limited(len)
-  }
-
-  async fn capacity(&self) -> QueueSize {
-    self.capacity.clone()
-  }
-
-  async fn offer(&mut self, element: E) -> anyhow::Result<()> {
-    if self.non_full() {
-      let mut mg = self.elements.lock().await;
-      mg.push_back(element);
-      Ok(())
-    } else {
-      Err(QueueError::OfferError(element).into())
-    }
-  }
-
-  async fn poll(&mut self) -> anyhow::Result<Option<E>> {
-    let mut mg = self.elements.lock().await;
-    Ok(mg.pop_front())
-  }
 }
 
 impl<E: Element + 'static> QueueLinkedList<E> {
@@ -79,6 +54,35 @@ impl<E: Element + 'static> QueueLinkedList<E> {
   }
 }
 
+#[async_trait::async_trait]
+impl<E: Element + 'static> QueueBehavior<E> for QueueLinkedList<E> {
+  async fn len(&self) -> QueueSize {
+    let mg = self.elements.lock().await;
+    let len = mg.len();
+    QueueSize::Limited(len)
+  }
+
+  async fn capacity(&self) -> QueueSize {
+    self.capacity.clone()
+  }
+
+  async fn offer(&mut self, element: E) -> anyhow::Result<()> {
+    if self.non_full() {
+      let mut mg = self.elements.lock().await;
+      mg.push_back(element);
+      Ok(())
+    } else {
+      Err(QueueError::OfferError(element).into())
+    }
+  }
+
+  async fn poll(&mut self) -> anyhow::Result<Option<E>> {
+    let mut mg = self.elements.lock().await;
+    Ok(mg.pop_front())
+  }
+}
+
+#[async_trait::async_trait]
 impl<E: Element + 'static> HasPeekBehavior<E> for QueueLinkedList<E> {
   async fn peek(&self) -> anyhow::Result<Option<E>> {
     let mg = self.elements.lock().await;
@@ -86,6 +90,7 @@ impl<E: Element + 'static> HasPeekBehavior<E> for QueueLinkedList<E> {
   }
 }
 
+#[async_trait::async_trait]
 impl<E: Element + PartialEq + 'static> HasContainsBehavior<E> for QueueLinkedList<E> {
   async fn contains(&self, element: &E) -> bool {
     let mg = self.elements.lock().await;

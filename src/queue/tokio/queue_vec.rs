@@ -13,34 +13,6 @@ pub struct QueueVec<E> {
   capacity: QueueSize,
 }
 
-#[async_trait::async_trait]
-impl<E: Element + 'static> QueueBehavior<E> for QueueVec<E> {
-  async fn len(&self) -> QueueSize {
-    let mg = self.elements.lock().await;
-    let len = mg.len();
-    QueueSize::Limited(len)
-  }
-
-  async fn capacity(&self) -> QueueSize {
-    self.capacity.clone()
-  }
-
-  async fn offer(&mut self, element: E) -> anyhow::Result<()> {
-    if self.non_full() {
-      let mut mg = self.elements.lock().await;
-      mg.push_back(element);
-      Ok(())
-    } else {
-      Err(QueueError::OfferError(element).into())
-    }
-  }
-
-  async fn poll(&mut self) -> anyhow::Result<Option<E>> {
-    let mut mg = self.elements.lock().await;
-    Ok(mg.pop_front())
-  }
-}
-
 impl<E: Element> QueueVec<E> {
   /// Create a new `QueueVec`.<br/>
   /// 新しい `QueueVec` を作成します。
@@ -77,5 +49,33 @@ impl<E: Element> QueueVec<E> {
       q: self,
       p: PhantomData,
     }
+  }
+}
+
+#[async_trait::async_trait]
+impl<E: Element + 'static> QueueBehavior<E> for QueueVec<E> {
+  async fn len(&self) -> QueueSize {
+    let mg = self.elements.lock().await;
+    let len = mg.len();
+    QueueSize::Limited(len)
+  }
+
+  async fn capacity(&self) -> QueueSize {
+    self.capacity.clone()
+  }
+
+  async fn offer(&mut self, element: E) -> anyhow::Result<()> {
+    if self.non_full() {
+      let mut mg = self.elements.lock().await;
+      mg.push_back(element);
+      Ok(())
+    } else {
+      Err(QueueError::OfferError(element).into())
+    }
+  }
+
+  async fn poll(&mut self) -> anyhow::Result<Option<E>> {
+    let mut mg = self.elements.lock().await;
+    Ok(mg.pop_front())
   }
 }

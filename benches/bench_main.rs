@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 use criterion::*;
+
 use queue_rs::queue::{QueueBehavior, QueueSize, QueueType};
 
 fn offer(c: &mut Criterion) {
