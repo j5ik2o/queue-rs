@@ -14,7 +14,7 @@ anyhow = "1.0.81"
 thiserror = "1.0.58"
 log = "0.4"
 tokio = { version = "1", features = ["sync", "macros", "rt", "test-util"], optional = false }
-async-trait = { version = "0.1.77", optional = false }
+async-trait = { version = "0.1.78", optional = false }
 tokio-condvar = { version = "0.1.0", optional = false }
 futures = { version = "0.3", optional = false }
 
