@@ -15,7 +15,7 @@ thiserror = "1.0.59"
 log = "0.4.21"
 tokio = { version = "1.37.0", features = ["sync", "macros", "rt", "test-util"], optional = false }
 async-trait = { version = "0.1.80", optional = false }
-tokio-condvar = { version = "0.1.0", optional = false }
+tokio-condvar = { version = "0.2.0", optional = false }
 futures = { version = "0.3.30", optional = false }
 
 
